@@ -1,17 +1,21 @@
 defmodule Mooncore.Dev.Plug do
   @moduledoc """
-  Development dashboard plug. Mount at `/mooncore` in your router.
+  Development dashboard and MCP server plug.
 
+  Runs on a dedicated port (default 4040), separate from the main app.
   Provides:
   - HTML dashboard with MCP tools, log viewer, and IEx console
+  - Standard MCP protocol endpoint (JSON-RPC 2.0 over Streamable HTTP)
   - JSON API endpoints for MCP operations
 
   Only active when `config :mooncore, devmode: true`.
+  Automatically started on the configured `mcp_port` (default: 4040).
 
-  ## Usage in your router
+  ## Configuration
 
-      # Add to your Plug.Router:
-      forward "/mooncore", to: Mooncore.Dev.Plug
+      config :mooncore,
+        devmode: true,
+        mcp_port: 4040   # default
   """
 
   use Plug.Router
@@ -35,6 +39,61 @@ defmodule Mooncore.Dev.Plug do
       |> send_resp(404, "Not Found")
       |> halt()
     end
+  end
+
+  # ── Standard MCP Protocol (JSON-RPC 2.0, Streamable HTTP) ──
+
+  post "/mcp" do
+    body = conn.body_params
+
+    case body do
+      # Batch request (array)
+      requests when is_list(requests) ->
+        responses =
+          requests
+          |> Enum.map(&Mooncore.MCP.Protocol.handle/1)
+          |> Enum.reject(&(&1 == :notification))
+
+        if responses == [] do
+          send_resp(conn, 202, "")
+        else
+          conn
+          |> put_resp_content_type("application/json")
+          |> send_resp(200, Jason.encode!(responses))
+        end
+
+      # Single request
+      request when is_map(request) ->
+        case Mooncore.MCP.Protocol.handle(request) do
+          :notification ->
+            send_resp(conn, 202, "")
+
+          response ->
+            conn
+            |> put_resp_content_type("application/json")
+            |> send_resp(200, Jason.encode!(response))
+        end
+
+      _ ->
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(
+          400,
+          Jason.encode!(%{
+            jsonrpc: "2.0",
+            id: nil,
+            error: %{code: -32700, message: "Parse error"}
+          })
+        )
+    end
+  end
+
+  get "/mcp" do
+    send_resp(conn, 405, "Method Not Allowed")
+  end
+
+  delete "/mcp" do
+    send_resp(conn, 405, "Method Not Allowed")
   end
 
   # ── HTML Dashboard ──

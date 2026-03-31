@@ -62,16 +62,16 @@ config :mooncore,
 
 ### Configuration Keys
 
-| Key | Type | Description |
-|-----|------|-------------|
-| `port` | integer | HTTP listening port (default: 4000) |
-| `router` | module | Your Plug.Router module |
-| `app_module` | module | Your App registry module |
-| `jwt` | keyword | `[key: "RSA private key PEM", issuer: "name"]` |
-| `pools` | list | Named client pool atoms (default: `[:default]`) |
-| `before_action` | list | Middleware modules run before actions |
-| `after_action` | list | Middleware modules run after actions |
-| `devmode` | boolean | Enables dev dashboard and MCP server |
+| Key             | Type    | Description                                     |
+| --------------- | ------- | ----------------------------------------------- |
+| `port`          | integer | HTTP listening port (default: 4000)             |
+| `router`        | module  | Your Plug.Router module                         |
+| `app_module`    | module  | Your App registry module                        |
+| `jwt`           | keyword | `[key: "RSA private key PEM", issuer: "name"]`  |
+| `pools`         | list    | Named client pool atoms (default: `[:default]`) |
+| `before_action` | list    | Middleware modules run before actions           |
+| `after_action`  | list    | Middleware modules run after actions            |
+| `devmode`       | boolean | Enables dev dashboard and MCP server            |
 
 ## Step 1: Define Your App
 
@@ -189,9 +189,6 @@ defmodule MyApp.Router do
     )
     |> halt()
   end
-
-  # Dev dashboard (only when devmode: true)
-  forward "/mooncore", to: Mooncore.Dev.Plug
 
   # Your own routes
   get "/" do

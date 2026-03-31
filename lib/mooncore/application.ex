@@ -10,7 +10,9 @@ defmodule Mooncore.Application do
       config :mooncore,
         port: 4000,                  # HTTP port (default: 4444)
         router: MyApp.Router,        # Your Plug.Router module
-        pools: [:default, :myapp]    # WebSocket client pool names
+        pools: [:default, :myapp],   # WebSocket client pool names
+        devmode: true,               # Enable dev dashboard & MCP
+        mcp_port: 4040               # Dev/MCP port (default: 4040)
   """
 
   use Application
@@ -45,7 +47,13 @@ defmodule Mooncore.Application do
 
     dev_children =
       if devmode do
-        [{Mooncore.MCP.Watcher, []}]
+        mcp_port = Mooncore.config(:mcp_port, 4040)
+
+        [
+          {Mooncore.MCP.Watcher, []},
+          {Bandit, plug: Mooncore.Dev.Plug, port: mcp_port, scheme: :http}
+          |> Supervisor.child_spec(id: :mcp_server)
+        ]
       else
         []
       end

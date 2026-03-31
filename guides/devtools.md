@@ -6,7 +6,9 @@ Mooncore includes a built-in development dashboard and MCP (Model Context Protoc
 
 ```elixir
 # config/dev.exs
-config :mooncore, devmode: true
+config :mooncore,
+  devmode: true,
+  mcp_port: 4040   # default, can be changed
 ```
 
 ```elixir
@@ -15,22 +17,20 @@ config :mooncore, devmode: false
 ```
 
 When devmode is enabled:
+- A dedicated HTTP server starts on `mcp_port` (default 4040)
 - The Watcher GenServer starts (in-memory log collector)
-- The MCP Server functions become available
-- The Dev Dashboard serves at `/mooncore`
+- The Dev Dashboard serves at `http://localhost:4040/`
+- The MCP protocol endpoint serves at `http://localhost:4040/mcp`
+- The JSON API serves at `http://localhost:4040/api/*`
 
 When devmode is off:
+- No dev server starts
 - Watcher doesn't start
 - All MCP Server functions return errors
-- Dev Dashboard returns 404
 
 ## Dev Dashboard
 
-Mount the dashboard in your router:
-
-```elixir
-forward "/mooncore", to: Mooncore.Dev.Plug
-```
+The dashboard is available at `http://localhost:4040/` (or your configured `mcp_port`).
 
 The dashboard is a single-page app built with Bootstrap 5 and Preact (loaded from CDN). It provides five tabs:
 
@@ -117,33 +117,33 @@ Mooncore.MCP.Server.clear_logs()
 
 ### JSON API
 
-The Dev Plug exposes a JSON API for all MCP operations:
+The dev server exposes a JSON API for all MCP operations (on `mcp_port`):
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/mooncore/api/mcp` | Generic MCP request (resource or tool) |
-| POST | `/mooncore/api/eval` | Evaluate Elixir code |
-| POST | `/mooncore/api/action` | Execute an action |
-| GET | `/mooncore/api/logs` | Read logs (query params: `tag`, `since`) |
-| GET | `/mooncore/api/actions` | List all actions |
-| GET | `/mooncore/api/config` | Get server config |
-| GET | `/mooncore/api/apps` | List apps |
+| Method | Path           | Description                              |
+| ------ | -------------- | ---------------------------------------- |
+| POST   | `/api/mcp`     | Generic MCP request (resource or tool)   |
+| POST   | `/api/eval`    | Evaluate Elixir code                     |
+| POST   | `/api/action`  | Execute an action                        |
+| GET    | `/api/logs`    | Read logs (query params: `tag`, `since`) |
+| GET    | `/api/actions` | List all actions                         |
+| GET    | `/api/config`  | Get server config                        |
+| GET    | `/api/apps`    | List apps                                |
 
 #### MCP Request Format
 
 ```bash
 # Get a resource
-curl -X POST http://localhost:4000/mooncore/api/mcp \
+curl -X POST http://localhost:4040/api/mcp \
   -H "Content-Type: application/json" \
   -d '{"resource": "actions"}'
 
 # Run a tool
-curl -X POST http://localhost:4000/mooncore/api/mcp \
+curl -X POST http://localhost:4040/api/mcp \
   -H "Content-Type: application/json" \
   -d '{"tool": "run_action", "action": "echo", "params": {"message": "hello"}}'
 
 # Evaluate code
-curl -X POST http://localhost:4000/mooncore/api/mcp \
+curl -X POST http://localhost:4040/api/mcp \
   -H "Content-Type: application/json" \
   -d '{"tool": "eval", "code": "Enum.sum(1..100)"}'
 ```
@@ -219,6 +219,54 @@ Each log entry is a map:
 ## Security Notes
 
 - **Never enable devmode in production.** The eval tool and action runner provide full access to the running system.
-- The Dev Plug returns 404 when devmode is off. The MCP Server functions throw errors when devmode is off. Both layers of protection ensure nothing leaks.
+- Dev dashboard, MCP, and all dev APIs run exclusively on the dedicated `mcp_port` (default 4040) — they are never exposed on the main app port.
 - The console evaluates real Elixir code — treat it like an IEx session with full system access.
 - Server config is sanitized (values are inspected as strings), but sensitive data could still be visible through eval or action execution.
+
+## VS Code MCP Integration
+
+Mooncore exposes a standard MCP endpoint using the Streamable HTTP transport at `http://localhost:4040/mcp`. This lets VS Code (GitHub Copilot agent mode) and other MCP clients connect directly.
+
+### Setup
+
+The MCP endpoint runs automatically on the dev port when devmode is enabled:
+
+```elixir
+# config/dev.exs
+config :mooncore,
+  devmode: true,
+  mcp_port: 4040   # default
+```
+
+Add to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "mooncore": {
+      "type": "http",
+      "url": "http://localhost:4040/mcp"
+    }
+  }
+}
+```
+
+### What's Available
+
+**Tools** (callable by the AI):
+- `run_action` — execute any Mooncore action
+- `read_logs` — read Watcher logs (filter by tag or since_id)
+- `clear_logs` — clear the log buffer
+- `eval` — evaluate Elixir code in the running app
+
+**Resources** (readable context):
+- `mooncore://actions` — all registered actions
+- `mooncore://apps` — app configurations
+- `mooncore://clients` — connected WebSocket clients
+- `mooncore://config` — server configuration
+
+### Requirements
+
+- `config :mooncore, devmode: true` must be set
+- The Mooncore server must be running
+- Dev dashboard and MCP are served only on the dedicated `mcp_port` (default 4040), never on the main app port
