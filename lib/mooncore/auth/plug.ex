@@ -25,10 +25,14 @@ defmodule Mooncore.Auth.Plug do
   end
 
   defp add_auth(conn) do
-    conn
-    |> fetch_auth_token()
-    |> Token.solve()
-    |> assign_auth(conn)
+    if Mooncore.jwt(:key) do
+      conn
+      |> fetch_auth_token()
+      |> Token.solve()
+      |> assign_auth(conn)
+    else
+      assign_auth({:error, :no_key}, conn)
+    end
   end
 
   defp assign_auth({:ok, auth}, conn) do
