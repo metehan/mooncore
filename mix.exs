@@ -11,7 +11,7 @@ defmodule Mooncore.MixProject do
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      description: "A lightweight, action-based web framework for Elixir.",
+      description: "A lightweight, action-based api framework for Elixir.",
       package: package(),
       docs: docs()
     ]
@@ -57,6 +57,8 @@ defmodule Mooncore.MixProject do
         "guides/websockets.md",
         "guides/middleware.md",
         "guides/devtools.md",
+        "guides/mcp.md",
+        "guides/skills.md",
         "guides/deployment.md"
       ],
       groups_for_extras: [

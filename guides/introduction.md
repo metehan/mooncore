@@ -1,6 +1,6 @@
 # Introduction
 
-Mooncore is a lightweight, action-based web framework for Elixir — a Phoenix alternative that puts **actions** at the center of everything.
+Mooncore is a lightweight, action-based api framework for Elixir — a Phoenix alternative that puts **actions** at the center of everything.
 
 ## Why Mooncore?
 
@@ -22,15 +22,15 @@ Mooncore takes a different path. Instead of building around HTTP request/respons
 
 ## What It Includes
 
-| Component | Purpose |
-|-----------|---------|
-| `Mooncore.Action` | Action dispatcher with role checking and middleware pipeline |
-| `Mooncore.Auth` | JWT RS256 authentication (token creation, verification, plug) |
-| `Mooncore.Endpoint.Http` | HTTP adapter — turns a Plug.Conn into an action call |
-| `Mooncore.Endpoint.Socket` | WebSocket adapter — pub/sub broadcasting and message routing |
-| `Mooncore.Middleware` | Before/after hooks for request/response transformation |
-| `Mooncore.App` | Multi-app registry — support multiple apps in one deployment |
-| `Mooncore.Dev` | Development dashboard and MCP server for AI observability |
+| Component                  | Purpose                                                       |
+| -------------------------- | ------------------------------------------------------------- |
+| `Mooncore.Action`          | Action dispatcher with role checking and middleware pipeline  |
+| `Mooncore.Auth`            | JWT RS256 authentication (token creation, verification, plug) |
+| `Mooncore.Endpoint.Http`   | HTTP adapter — turns a Plug.Conn into an action call          |
+| `Mooncore.Endpoint.Socket` | WebSocket adapter — pub/sub broadcasting and message routing  |
+| `Mooncore.Middleware`      | Before/after hooks for request/response transformation        |
+| `Mooncore.App`             | Multi-app registry — support multiple apps in one deployment  |
+| `Mooncore.Dev`             | Development dashboard and MCP server for AI observability     |
 
 ## What It Doesn't Include
 

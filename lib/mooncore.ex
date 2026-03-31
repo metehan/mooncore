@@ -1,6 +1,6 @@
 defmodule Mooncore do
   @moduledoc """
-  Mooncore — A lightweight, action-based web framework for Elixir.
+  Mooncore — A lightweight, action-based api framework for Elixir.
 
   Mooncore is a Phoenix alternative built around the action pattern:
   every feature is an action (a named operation mapped to a module function),

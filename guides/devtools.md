@@ -1,6 +1,8 @@
 # Dev Tools
 
-Mooncore includes a built-in development dashboard and MCP (Model Context Protocol) server for observability. Everything is gated behind devmode — nothing is exposed when devmode is off.
+Mooncore includes a built-in development dashboard for real-time observability of your running application. The dashboard is a full-featured single-page app with live VM metrics, action execution, developer tools, and more.
+
+> **Security:** Never enable devmode in production. The dashboard provides full access to eval, action execution, and file system browsing.
 
 ## Enabling Dev Mode
 
@@ -11,262 +13,185 @@ config :mooncore,
   mcp_port: 4040   # default, can be changed
 ```
 
-```elixir
-# config/prod.exs — never enable in production
-config :mooncore, devmode: false
-```
+When devmode is enabled, a dedicated HTTP server starts on `mcp_port` (default 4040). Open `http://localhost:4040/` in your browser.
 
-When devmode is enabled:
-- A dedicated HTTP server starts on `mcp_port` (default 4040)
-- The Watcher GenServer starts (in-memory log collector)
-- The Dev Dashboard serves at `http://localhost:4040/`
-- The MCP protocol endpoint serves at `http://localhost:4040/mcp`
-- The JSON API serves at `http://localhost:4040/api/*`
+When devmode is off, nothing dev-related starts — no server, no watcher, no overhead.
 
-When devmode is off:
-- No dev server starts
-- Watcher doesn't start
-- All MCP Server functions return errors
+## Dashboard Screens
 
-## Dev Dashboard
+The dashboard has a left sidebar with eight sections. Below is a detailed walkthrough of each.
 
-The dashboard is available at `http://localhost:4040/` (or your configured `mcp_port`).
+---
 
-The dashboard is a single-page app built with Bootstrap 5 and Preact (loaded from CDN). It provides five tabs:
+### Dashboard
 
-### Actions Tab
+The main overview of your running BEAM VM. Auto-refreshes every 2 seconds.
 
-Lists all registered actions across all apps with their handler modules, required roles, and public/protected status.
+**Overview tab** shows four metric cards with sparkline history charts:
 
-### Runner Tab
+- **Total Memory** — current total memory used by the VM
+- **CPU Runtime** — runtime ratio percentage (how busy the VM is)
+- **Processes** — number of active Erlang processes
+- **Reductions** — total reduction count (measure of work done)
 
-Execute actions directly from the browser. Enter an action name, JSON parameters, and optional auth — see the result in real-time.
+Below the cards:
 
-### Logs Tab
+- **Memory Breakdown** — horizontal bar chart showing memory split across processes, binary, ETS, atom, and code
+- **Scheduler Utilization** — per-scheduler CPU percent with color coding (green < 50%, yellow < 80%, red > 80%)
+- **VM Limits** — gauge bars for processes, atoms, ports, and ETS tables vs their limits
+- **Quick Stats** — runtime, CPU runtime ratio, ETS table count
 
-View lifecycle logs collected by the Watcher. Filter by tag, auto-refresh, and see elapsed times for each action phase.
+**Processes tab** — table of the top 20 processes sorted by memory:
 
-Trigger lifecycle logging by adding `"mooncore_log": true` to any action's parameters:
+| Column           | Description                                 |
+| ---------------- | ------------------------------------------- |
+| Name / PID       | Registered name (if any) and PID            |
+| Memory           | Process heap memory                         |
+| MQ               | Message queue length (amber > 0, red > 100) |
+| Reductions       | Work done by this process                   |
+| Status           | running / waiting / suspended               |
+| Current Function | What the process is currently executing     |
 
-```bash
-curl -X POST http://localhost:4000/run \
-  -H "Content-Type: application/json" \
-  -d '{"action": "task.create", "title": "Test", "mooncore_log": true}'
-```
+**ETS tab** — all ETS tables sorted by memory, showing name, row count, memory, and type (set, ordered_set, bag, etc.).
 
-### Console Tab
+**Apps tab** — all started OTP applications with name, version, and description.
 
-An IEx-like REPL in the browser. Evaluate Elixir code against the running application:
+---
 
-```elixir
-Mooncore.App.list()
-Mooncore.Endpoint.Socket.Clients.list_all()
-:ets.all() |> length()
-```
+### Api
 
-Results are displayed with `inspect/1` formatting.
+Lists all registered actions across all your apps, grouped by app.
 
-### Config Tab
+Each app group shows:
+- App name and action module
+- Defined roles
+- Action count
 
-View the current Mooncore configuration (sanitized — no secrets).
+Each action row shows:
+- Action name (e.g. `task.create`)
+- Handler function (e.g. `MyApp.Action.Task.create`)
+- Access level — **public** (green badge, no roles required) or **protected** (violet badge listing required roles)
 
-## MCP Server
+---
 
-The MCP Server exposes framework internals for AI tools, IDE integrations, or custom tooling. All functions require devmode.
+### Actions (Runner)
 
-### Resources (Read-Only)
+Execute any action directly from the browser.
 
-```elixir
-# List all registered actions
-Mooncore.MCP.Server.list_actions()
-# [%{app: "myapp", action: "task.create", handler: "MyApp.Action.Task.create", roles: ["user"], public: false}, ...]
+**Fields:**
+- **Action** — action name string (e.g. `task.create`)
+- **Params (JSON)** — JSON object of parameters to pass
+- **Auth (JSON, optional)** — auth context with roles, user, app, etc.
 
-# List connected WebSocket clients
-Mooncore.MCP.Server.list_clients()
-# [%{group: "acme", channels: [%{channel: "@alice", count: 1}], total: 1}]
+**Buttons:**
+- **Run** — executes the action through the full pipeline and shows the JSON result below
+- **→ To Eval** — converts the action call to an Elixir `Mooncore.Action.execute(...)` expression and sends it to the Console
 
-# List registered apps
-Mooncore.MCP.Server.list_apps()
-# [%{key: "myapp", name: "My Application", roles: [...], action_module: "MyApp.Action"}]
+When the Actions page is active, the **right panel** shows the **Action Logs** panel (see below).
 
-# Get server configuration
-Mooncore.MCP.Server.server_info()
-# %{port: 4000, router: "MyApp.Router", devmode: true, ...}
-```
+---
 
 ### Tools
 
-```elixir
-# Execute an action
-Mooncore.MCP.Server.run_action("task.list", %{}, nil)
+A collection of developer utilities, organized in sub-tabs:
 
-# Evaluate Elixir code
-Mooncore.MCP.Server.eval_code("1 + 1")
-# %{result: "2"}
+**JSON ↔ Elixir** — bidirectional converter between JSON objects and Elixir map syntax. Paste JSON and get `%{"key" => "value"}` map notation, or vice versa. Has a Copy button.
 
-# Subscribe to log stream
-Mooncore.MCP.Server.add_watcher_session(:lifecycle)
+**JWT Token** — two modes:
+- **Create Token** — enter claims as JSON (user, app, roles, etc.), generates a signed JWT using your configured RS256 key. Shows the raw token with copy support.
+- **Decode Token** — paste a JWT, verify it against your key with **Verify & Decode**, or just decode the payload without verification using **Decode Payload (no verify)**. Shows expiry info (`_expired`, `_exp_human`).
 
-# Read collected logs
-Mooncore.MCP.Server.read_logs(%{"tag" => "lifecycle"})
-Mooncore.MCP.Server.read_logs(%{"since" => 42})
+**Base64** — encode/decode with standard and URL-safe variants. Four buttons: Encode, Decode, URL-safe Encode, URL-safe Decode.
 
-# Clear logs
-Mooncore.MCP.Server.clear_logs()
-```
+**Timestamps** — convert between Unix timestamps and ISO 8601 dates. Auto-detects seconds vs milliseconds. Shows a live "Now" counter. **Use now** button fills both fields with the current time.
 
-### JSON API
+**Inspect** — evaluate any Elixir expression and get `inspect/1` output with pretty-printing. Also has a **Type Info** button that shows the type, byte_size (for binaries), and length (for lists/maps).
 
-The dev server exposes a JSON API for all MCP operations (on `mcp_port`):
+---
 
-| Method | Path           | Description                              |
-| ------ | -------------- | ---------------------------------------- |
-| POST   | `/api/mcp`     | Generic MCP request (resource or tool)   |
-| POST   | `/api/eval`    | Evaluate Elixir code                     |
-| POST   | `/api/action`  | Execute an action                        |
-| GET    | `/api/logs`    | Read logs (query params: `tag`, `since`) |
-| GET    | `/api/actions` | List all actions                         |
-| GET    | `/api/config`  | Get server config                        |
-| GET    | `/api/apps`    | List apps                                |
+### Guides
 
-#### MCP Request Format
+A Livebook-style markdown editor for your project's `guides/` directory.
 
-```bash
-# Get a resource
-curl -X POST http://localhost:4040/api/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"resource": "actions"}'
+**Guide list** — shows all `.md` files from your project's `guides/` folder with name and filename.
 
-# Run a tool
-curl -X POST http://localhost:4040/api/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"tool": "run_action", "action": "echo", "params": {"message": "hello"}}'
+**Guide editor** — split-pane view:
+- **Left pane** — CodeMirror editor with markdown syntax highlighting. Supports Ctrl+S / Cmd+S to save.
+- **Right pane** — live rendered preview of the markdown content.
 
-# Evaluate code
-curl -X POST http://localhost:4040/api/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"tool": "eval", "code": "Enum.sum(1..100)"}'
-```
+Code blocks with `elixir`, `ex`, `exs`, or `iex` language tags get a **▶ Run** button (appears on hover) that evaluates the code in the running application and shows the result inline. You can edit the code in the block before running.
 
-## Watcher
+Changes are saved back to the actual file on disk.
 
-The Watcher is a GenServer that collects logs in a ring buffer (max 1000 entries by default). It only runs when devmode is enabled.
+---
 
-### Logging Events
+### Clients
 
-From anywhere in your application:
+Real-time view of WebSocket connections, grouped by pool/group.
 
-```elixir
-# Log with a tag
-Mooncore.MCP.Watcher.log(:custom, %{message: "Something happened", user: "alice"})
+**Header** shows total connection count and total channel count. Auto-refreshes every 3 seconds (toggleable with ⏸/▶ button).
 
-# Log with different tags
-Mooncore.MCP.Watcher.log(:db, %{query: "FOR t IN tasks RETURN t", time_ms: 12})
-Mooncore.MCP.Watcher.log(:auth, %{event: "login", user: "alice"})
-Mooncore.MCP.Watcher.log(:error, %{action: "task.create", reason: "validation failed"})
-```
+**Groups** — each group is expandable (default: expanded) showing:
+- Group name
+- PID count
+- Channel count
 
-The `:lifecycle` tag is used automatically by the action pipeline when `mooncore_log: true`.
+**Channels** — each channel shows its name with an icon:
+- `@` prefix (cyan) — user channels
+- `#` prefix (violet) — room/topic channels
 
-### Reading Logs
+Click a channel to expand and see individual member PIDs with green connection dots.
 
-```elixir
-# All logs (newest first)
-Mooncore.MCP.Watcher.read()
+---
 
-# Filtered by tag
-Mooncore.MCP.Watcher.read(:lifecycle)
-Mooncore.MCP.Watcher.read(:custom)
+### Console
 
-# Since a specific entry ID (for polling)
-Mooncore.MCP.Watcher.read_since(last_seen_id)
-```
+An IEx-like REPL running against your live application.
 
-### Real-Time Watchers
+Features:
+- Type Elixir expressions and press Enter (or click **Run**) to evaluate
+- Results show in green, errors in red, input in violet
+- **Command history** — press ↑/↓ arrows to navigate previous commands
+- Shift+Enter for multi-line input
 
-Subscribe a process to receive logs as they happen:
+Everything evaluates via `Code.eval_string/1` in the running application — treat it like a full IEx session.
 
-```elixir
-# Watch all logs
-Mooncore.MCP.Watcher.add_watcher(self())
+Other pages can send code here: the Actions page has a **→ To Eval** button, and the Tools/Inspect page evaluates directly.
 
-# Watch only lifecycle logs
-Mooncore.MCP.Watcher.add_watcher(self(), :lifecycle)
+---
 
-# Receive logs
-receive do
-  {:mooncore_log, tag, entry} ->
-    IO.inspect({tag, entry})
-end
+### Files
 
-# Stop watching
-Mooncore.MCP.Watcher.remove_watcher(self())
-```
+A file browser for your project directory.
 
-### Log Entry Format
+- Navigate directories by clicking folders
+- Click files to open them in the **right panel editor**
+- Shows file sizes
+- **↑ Up** button to go to parent directory
+- Hides dotfiles and `_build`, `deps`, `node_modules`, `.git` directories
 
-Each log entry is a map:
+**Right panel file editor:**
+- CodeMirror editor with syntax highlighting (Elixir, Erlang, JavaScript, HTML, CSS, Markdown, YAML, Shell, etc.)
+- Shows language label and file path
+- **Save** button (also Ctrl+S / Cmd+S) — writes changes to disk
+- **Eval** button — appears for `.ex` and `.exs` files, evaluates the entire file content
+- Dirty indicator (amber dot) when there are unsaved changes
 
-```elixir
-%{
-  id: 1,                          # unique, incrementing integer
-  tag: :lifecycle,                 # the tag atom
-  data: %{action: "task.create"},  # your data
-  ts: 1711827600000                # timestamp (milliseconds)
-}
-```
+---
 
-## Security Notes
+## Action Logs Panel
 
-- **Never enable devmode in production.** The eval tool and action runner provide full access to the running system.
-- Dev dashboard, MCP, and all dev APIs run exclusively on the dedicated `mcp_port` (default 4040) — they are never exposed on the main app port.
-- The console evaluates real Elixir code — treat it like an IEx session with full system access.
-- Server config is sanitized (values are inspected as strings), but sensitive data could still be visible through eval or action execution.
+The right panel shows **Action Logs** whenever the Actions page is active and no file is open. This is a live feed of all action executions across HTTP, WebSocket, and MCP sources.
 
-## VS Code MCP Integration
+Features:
+- **Auto-refresh** every 2 seconds (toggleable)
+- **Filter** by action name
+- **Clear** button to wipe the log buffer
+- Each log entry shows: action name, source badge (ws/http), error indicator (✗), and duration in ms
 
-Mooncore exposes a standard MCP endpoint using the Streamable HTTP transport at `http://localhost:4040/mcp`. This lets VS Code (GitHub Copilot agent mode) and other MCP clients connect directly.
-
-### Setup
-
-The MCP endpoint runs automatically on the dev port when devmode is enabled:
-
-```elixir
-# config/dev.exs
-config :mooncore,
-  devmode: true,
-  mcp_port: 4040   # default
-```
-
-Add to `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "mooncore": {
-      "type": "http",
-      "url": "http://localhost:4040/mcp"
-    }
-  }
-}
-```
-
-### What's Available
-
-**Tools** (callable by the AI):
-- `run_action` — execute any Mooncore action
-- `read_logs` — read Watcher logs (filter by tag or since_id)
-- `clear_logs` — clear the log buffer
-- `eval` — evaluate Elixir code in the running app
-
-**Resources** (readable context):
-- `mooncore://actions` — all registered actions
-- `mooncore://apps` — app configurations
-- `mooncore://clients` — connected WebSocket clients
-- `mooncore://config` — server configuration
-
-### Requirements
-
-- `config :mooncore, devmode: true` must be set
-- The Mooncore server must be running
-- Dev dashboard and MCP are served only on the dedicated `mcp_port` (default 4040), never on the main app port
+**Expanded entry** shows:
+- IP address and timestamp
+- **Params** — with Copy JSON and Copy Map (Elixir syntax) buttons
+- **Auth** — authentication context used
+- **Response** — action result with Copy buttons
+- **Load in Runner** — pre-fills the Actions page with this action's name, params, and auth for re-execution

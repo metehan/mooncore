@@ -4,21 +4,63 @@
 
 # Mooncore
 
-A lightweight, action-based web framework for Elixir. A Phoenix alternative built around the action pattern.
+A lightweight, action-based api framework for Elixir.
 
-## Core Concept
+## Why Actions, Not REST
 
-Every feature is an **action** — a named operation mapped to a module function. Actions are transport-agnostic: the same action works via HTTP, WebSocket, local Elixir call, or any other protocol.
+REST was designed for documents — CRUD operations on URL-addressable resources. It works, but it forces you to think in terms of HTTP: which verb, which URL path, which status code, how to nest resources, how to handle batch operations that don't fit the resource model.
+
+Mooncore replaces all of that with a single concept: **actions**. Every feature is a named function call.
 
 ```
-               ┌─── HTTP (POST /run)
-               │
-Action.run/2 ◄─┼─── WebSocket
-               │
-               ├─── Local Elixir call
-               │
-               └─── Any protocol you add
+REST                              Mooncore
+────                              ────────
+GET    /api/tasks                 "task.list"
+POST   /api/tasks                 "task.create"
+PUT    /api/tasks/:id             "task.update"
+DELETE /api/tasks/:id             "task.delete"
+POST   /api/tasks/:id/assign      "task.assign"
+POST   /api/tasks/batch-archive   "task.batch_archive"
+GET    /api/reports/weekly?...     "report.weekly"
 ```
+
+No routing tables, no path params, no verb selection, no "is this a PUT or PATCH" debates. Just action names and parameters.
+
+### Transport Independence
+
+Actions don't know how they were called. The same `"task.create"` works across every transport without modification:
+
+```
+               ┌─── HTTP POST /run
+               │
+               ├─── WebSocket message
+               │
+Action.run/2 ◄─┼─── Elixir function call
+               │
+               ├─── MCP tool call (AI agents)
+               │
+               ├─── Protobuf / gRPC adapter
+               │
+               ├─── Message queue consumer
+               │
+               └─── Cron scheduler
+```
+
+With REST, adding WebSocket support means rebuilding your entire API layer. With actions, you write the logic once and plug in transports. Need a NATS consumer that triggers `"order.process"`? It's one adapter that calls `Action.execute/2` — your handler doesn't change.
+
+### AI-Native Development
+
+Actions are pure functions: a name, a parameter map, a result. This is the ideal interface for AI-assisted development — an agent can generate a handler, call it through the built-in MCP server, inspect the result, and iterate. No HTTP client setup, no URL construction, no status code interpretation. Just `{"action": "task.create", "title": "Buy milk"}`.
+
+Because Mooncore includes an MCP server out of the box, AI agents connect directly to the running application. They discover available actions, execute them, read logs, and evaluate code — all through the same action interface your frontend uses. The functional style (map in, map out) means agents produce correct code faster with fewer tokens, since there's no framework boilerplate or object hierarchy to reason about.
+
+### Clean Separation
+
+Because actions are transport-agnostic, your application logic has zero coupling to HTTP, WebSocket, or any delivery mechanism. This means:
+
+- **UI logic stays in the UI.** Your backend is a flat list of operations, not a REST hierarchy that mirrors your page structure.
+- **Testing is trivial.** Call the action function directly with a map. No HTTP client, no router, no connection struct.
+- **New protocols are adapters, not rewrites.** Add protobuf, GraphQL, message queues, or schedulers without touching business logic.
 
 ## Installation
 
@@ -272,6 +314,10 @@ Mooncore.MCP.Server.server_info()    # Server configuration
 | `:function`             | Function atom                                       |
 | `required_roles`        | `[]` = public, `~w(user)` = requires "user" role    |
 | `request_modifications` | Map deep-merged into request before calling handler |
+
+## For AI Agents
+
+If you are an AI coding agent, read [`guides/skills.md`](guides/skills.md) before generating Mooncore code. It contains scaffolding templates, critical rules and common patterns.
 
 ## License
 
