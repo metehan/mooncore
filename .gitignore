@@ -1,0 +1,10 @@
+/_build/
+/deps/
+/doc/
+/.vscode/
+/.idea/
+/.elixir-tools/
+*.beam
+*.ez
+erl_crash.dump
+.DS_Store
