@@ -141,13 +141,13 @@ The alternative — a framework that handles every concern — gives you more ou
 
 Every design choice has a cost. Here's what Mooncore trades away:
 
-| You get | You give up |
-|---|---|
+| You get                     | You give up                                                           |
+| --------------------------- | --------------------------------------------------------------------- |
 | Transport-agnostic handlers | HTTP-specific features (streaming responses, SSE) require manual work |
-| No database coupling | No schema validation, no migration generators, no query DSL |
-| You own the router | No automatic route generation from action definitions |
-| Explicit everything | More boilerplate for initial setup |
-| Small framework | Fewer batteries included |
-| Multi-tenancy built in | Single-tenant apps carry slight conceptual overhead |
+| No database coupling        | No schema validation, no migration generators, no query DSL           |
+| You own the router          | No automatic route generation from action definitions                 |
+| Explicit everything         | More boilerplate for initial setup                                    |
+| Small framework             | Fewer batteries included                                              |
+| Multi-tenancy built in      | Single-tenant apps carry slight conceptual overhead                   |
 
 These tradeoffs are deliberate. Mooncore is for developers who prefer a small, explicit foundation they fully understand over a large, capable framework they partially understand.
