@@ -4,12 +4,10 @@ Actions are the core abstraction in Mooncore. Every feature in your application 
 
 ## Defining Actions
 
-Create an action module with `use Mooncore.Action`:
+**Define `@actions` before `use Mooncore.Action`** — the macro captures the attribute at compile time:
 
 ```elixir
 defmodule MyApp.Action do
-  use Mooncore.Action
-
   @actions %{
     "task.create"    => {MyApp.Action.Task, :create, ~w(user admin), %{}},
     "task.list"      => {MyApp.Action.Task, :list, ~w(user admin), %{}},
@@ -18,8 +16,14 @@ defmodule MyApp.Action do
     "echo"           => {MyApp.Action.Echo, :echo, [], %{}},
     "health.check"   => {MyApp.Action.Health, :check, [], %{}},
   }
+
+  use Mooncore.Action
 end
 ```
+
+> If `@actions` is defined **after** `use Mooncore.Action`, the `actions_map/0`
+> function will return `nil` and no actions will dispatch. This is silent — no
+> compile error — so always put `@actions` first.
 
 ### Action Tuple Format
 
@@ -55,17 +59,18 @@ Both actions call the same function, but with different configuration merged int
 
 ## Writing Handlers
 
-Action handlers are plain functions. They receive a request map and return a result:
+Action handlers are plain functions. They receive a request map and return a result.
+Access params with `req[:params]["key"]` — the user data and `"action"` key are at the same level:
 
 ```elixir
 defmodule MyApp.Action.Task do
   def create(req) do
-    params = req[:params]
+    # req[:params] = %{"action" => "task.create", "title" => "...", ...}
     db = req[:db]  # injected by middleware
     auth = req[:auth]
 
     case db.insert("tasks", %{
-      title: params["title"],
+      title: req[:params]["title"],
       created_by: auth["user"]
     }) do
       {:ok, task} -> %{ok: true, task: task}
@@ -101,9 +106,10 @@ The request map contains everything the handler needs:
     "scope" => "default",
     "roles" => ["user", "admin"]
   },
-  params: %{                  # All parameters from the client
-    "action" => "task.create",
-    "title" => "My Task"
+  params: %{                  # the FULL request body / WS message
+    "action" => "task.create",  # action name lives here too
+    "title" => "My Task",       # user data at the top level
+    "rayid" => "abc-123"        # (WebSocket only) correlation id
   },
   # Additional keys from middleware:
   db: #DBConnection<...>,     # from MyApp.Middleware.DB
@@ -112,6 +118,10 @@ The request map contains everything the handler needs:
   timeout: 30_000
 }
 ```
+
+`req[:params]` is the entire parsed request body (HTTP) or the full WebSocket
+message. User-supplied fields sit alongside the `"action"` key — there is no
+extra nesting level.
 
 ### Return Values
 
@@ -246,11 +256,11 @@ If an action name isn't found in the action map, Mooncore tries a command fallba
 
 ```elixir
 defmodule MyApp.Action do
-  use Mooncore.Action
-
   @actions %{
     "task.create" => {MyApp.Action.Task, :create, ~w(user), %{}},
   }
+
+  use Mooncore.Action
 
   # Catches any action not in @actions
   def command(action_name, request) do

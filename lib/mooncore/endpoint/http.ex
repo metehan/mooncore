@@ -10,6 +10,22 @@ defmodule Mooncore.Endpoint.Http do
       match "/run" do
         Mooncore.Endpoint.Http.handle(conn)
       end
+
+  ## Request Map
+
+  The entire parsed request body (`conn.params`) becomes `req[:params]`.
+  For a request like:
+
+      POST /run {"action": "task.create", "title": "Hello"}
+
+  The handler receives:
+
+      %{
+        auth: %{...} | nil,
+        params: %{"action" => "task.create", "title" => "Hello"}
+      }
+
+  User data sits alongside the `"action"` key — there is no extra nesting.
   """
 
   @doc """

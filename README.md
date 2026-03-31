@@ -60,28 +60,33 @@ end
 
 ### 2. Define actions
 
+> **Important:** `@actions` must be defined **before** `use Mooncore.Action`.
+> The macro captures `@actions` at compile time.
+
 ```elixir
 defmodule MyApp.Action do
-  use Mooncore.Action
-
   @actions %{
     "echo"        => {MyApp.Action.Echo, :echo, [], %{}},
     "task.create" => {MyApp.Action.Task, :create, ~w(user), %{}},
     "task.list"   => {MyApp.Action.Task, :list, ~w(user), %{}},
   }
+
+  use Mooncore.Action
 end
 
 defmodule MyApp.Action.Echo do
-  def echo(req), do: %{echo: req.params}
+  def echo(req), do: %{echo: req[:params]}
 end
 
 defmodule MyApp.Action.Task do
   def create(req) do
-    record = req.params["record"]
+    # req[:params] is the full request body:
+    # %{"action" => "task.create", "title" => "Buy milk", ...}
+    title = req[:params]["title"]
     # ... your persistence logic ...
     # Publish to WebSocket clients:
-    Mooncore.Endpoint.Socket.publish(req[:dkey], {"record-add", record})
-    {:ok, record}
+    Mooncore.Endpoint.Socket.publish(req[:auth]["dkey"], {"task-created", %{title: title}})
+    {:ok, %{title: title}}
   end
 
   def list(req) do
@@ -165,23 +170,31 @@ config :mooncore,
 
 ```elixir
 # From HTTP — handled by router
-# POST /run {"action": "task.create", "record": {"title": "Test"}}
+# POST /run {"action": "task.create", "title": "Test"}
 
 # From WebSocket — handled by socket handler
-# {"action": "task.create", "record": {"title": "Test"}, "rayid": "abc"}
+# {"action": "task.create", "title": "Test", "rayid": "abc"}
 
 # From Elixir code — no transport needed
 MyApp.Action.run("task.create", %{
-  params: %{"record" => %{"title" => "Test"}},
+  params: %{"action" => "task.create", "title" => "Test"},
   auth: %{"roles" => ["user"]}
 })
 
 # Through the middleware pipeline
 Mooncore.Action.execute("task.create", %{
-  params: %{"record" => %{"title" => "Test"}},
+  params: %{"action" => "task.create", "title" => "Test"},
   auth: %{"roles" => ["user"]}
 })
 ```
+
+### 6. Run
+
+```bash
+mix run --no-halt
+```
+
+`Mooncore.Application` starts the Bandit HTTP server automatically — you don't need to add anything to your own supervision tree.
 
 ## Middleware
 

@@ -100,17 +100,17 @@ end
 
 ## Step 2: Define Your Actions
 
-Create an action module with `use Mooncore.Action`:
+Create an action module. **Define `@actions` before `use Mooncore.Action`** — the macro captures the attribute at compile time:
 
 ```elixir
 defmodule MyApp.Action do
-  use Mooncore.Action
-
   @actions %{
     "echo"        => {MyApp.Action.Echo, :echo, [], %{}},
     "task.create" => {MyApp.Action.Task, :create, ~w(user admin), %{}},
     "task.list"   => {MyApp.Action.Task, :list, ~w(user admin), %{}},
   }
+
+  use Mooncore.Action
 end
 ```
 
@@ -125,7 +125,14 @@ Each action entry is:
 
 ## Step 3: Write Action Handlers
 
-Action handlers are plain functions that receive a request map and return a result:
+Action handlers are plain functions that receive a request map and return a result.
+
+`req[:params]` is the **entire request body** — user data sits alongside the `"action"` key:
+
+```elixir
+# Client sends: POST /run {"action": "task.create", "title": "Buy milk"}
+# Handler receives: req[:params] = %{"action" => "task.create", "title" => "Buy milk"}
+```
 
 ```elixir
 defmodule MyApp.Action.Echo do
@@ -215,7 +222,9 @@ Or in IEx:
 iex -S mix
 ```
 
-Your server is now running on the configured port. Test it:
+`Mooncore.Application` starts the Bandit HTTP server automatically on the configured port — you don't need to add anything to your own supervision tree.
+
+Test it:
 
 ```bash
 # Public action (no auth required)

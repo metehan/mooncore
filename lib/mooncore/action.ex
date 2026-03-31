@@ -8,14 +8,18 @@ defmodule Mooncore.Action do
   ## Usage
 
       defmodule MyApp.Action do
-        use Mooncore.Action
-
         @actions %{
           "task.create" => {MyApp.Action.Task, :create, ~w(user), %{}},
           "task.list"   => {MyApp.Action.Task, :list, ~w(user), %{}},
           "echo"        => {MyApp.Action.Echo, :echo, [], %{}},
         }
+
+        use Mooncore.Action
       end
+
+  > **Important:** `@actions` must be defined **before** `use Mooncore.Action`.
+  > The macro captures `@actions` at compile time — if it's defined after,
+  > `actions_map/0` will return `nil` and nothing will dispatch.
 
   Actions are defined as:
 
@@ -23,6 +27,22 @@ defmodule Mooncore.Action do
 
   - `required_roles` — list of role strings. `[]` means public (no auth needed).
   - `request_modifications` — map deep-merged into the request before calling the handler.
+
+  ## Request Map Structure
+
+  The request map passed to handlers looks like:
+
+      %{
+        auth: %{"user" => "alice", "app" => "myapp", "roles" => ["user"], ...},
+        params: %{                        # the FULL request body / message
+          "action" => "task.create",     # action name lives here too
+          "title" => "My Task",          # user data is at the top level
+          "rayid" => "abc-123"           # (WebSocket only) correlation id
+        }
+      }
+
+  `req[:params]` is the entire parsed request body (HTTP) or the full
+  WebSocket message. User-supplied fields sit alongside `"action"`.
 
   ## Calling Actions
 
