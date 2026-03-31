@@ -1,7 +1,7 @@
 defmodule Mooncore.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/metehan/mooncore"
 
   def project do
@@ -11,7 +11,7 @@ defmodule Mooncore.MixProject do
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      description: "A lightweight, action-based web framework for Elixir. Phoenix alternative.",
+      description: "A lightweight, action-based web framework for Elixir.",
       package: package(),
       docs: docs()
     ]

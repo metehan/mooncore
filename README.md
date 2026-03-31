@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="guides/mooncore.png" alt="Mooncore" width="120" />
+</p>
+
 # Mooncore
 
 A lightweight, action-based web framework for Elixir. A Phoenix alternative built around the action pattern.
@@ -261,12 +265,12 @@ Mooncore.MCP.Server.server_info()    # Server configuration
 "action.name" => {Module, :function, required_roles, request_modifications}
 ```
 
-| Component | Description |
-|-----------|-------------|
-| `"action.name"` | Unique string identifier, dot-notation |
-| `Module` | Handler module |
-| `:function` | Function atom |
-| `required_roles` | `[]` = public, `~w(user)` = requires "user" role |
+| Component               | Description                                         |
+| ----------------------- | --------------------------------------------------- |
+| `"action.name"`         | Unique string identifier, dot-notation              |
+| `Module`                | Handler module                                      |
+| `:function`             | Function atom                                       |
+| `required_roles`        | `[]` = public, `~w(user)` = requires "user" role    |
 | `request_modifications` | Map deep-merged into request before calling handler |
 
 ## License

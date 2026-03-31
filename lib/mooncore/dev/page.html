@@ -1,0 +1,2031 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mooncore Dev</title>
+  <!-- CSS only in head - scripts moved to body for fast preloader -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+  <style>
+    /* Preloader - must be before scripts for instant rendering */
+    #preloader {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #030712;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.3s ease;
+    }
+
+    #preloader.fade-out {
+      opacity: 0;
+    }
+
+    #preloader img {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    #preloader span {
+      margin-top: 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #6b7280;
+      letter-spacing: 0.05em;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .4
+      }
+    }
+  </style>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #a78bfa;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    pre,
+    code {
+      font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+      margin: 0;
+    }
+
+    code {
+      font-size: 0.8em;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #7c3aed !important;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th {
+      text-align: left;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    .editor-textarea {
+      resize: none;
+      tab-size: 2;
+      line-height: 1.6;
+    }
+
+    .editor-textarea:focus {
+      outline: none;
+      box-shadow: none !important;
+      border-color: #374151 !important;
+    }
+
+    .cm-wrap {
+      height: 100%;
+    }
+
+    .cm-wrap .CodeMirror {
+      height: 100%;
+      background: #030712;
+      font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .cm-wrap .CodeMirror-gutters {
+      background: #030712;
+      border-right: 1px solid #1f2937;
+    }
+
+    .cm-wrap-block .CodeMirror {
+      height: auto;
+      background: #030712;
+      font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .cm-wrap-block .CodeMirror-gutters {
+      background: #030712;
+      border-right: 1px solid #1f2937;
+    }
+
+    .cm-wrap-block .CodeMirror-scroll {
+      min-height: 0;
+    }
+
+    .guide-content p {
+      max-width: 65ch;
+    }
+
+    .log-expand {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .log-expand:hover {
+      background: rgba(139, 92, 246, 0.08);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .log-new {
+      animation: fadeIn 0.2s ease-out;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-950 text-gray-300 h-screen flex flex-col">
+  <div id="preloader">
+    <img src="assets/mooncore.png" alt="" />
+    <span>Mooncore</span>
+  </div>
+  <div id="app" class="flex-1 flex flex-col overflow-hidden"></div>
+
+  <!-- External scripts loaded here so preloader renders first -->
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime"></script>
+  <script src="https://cdn.jsdelivr.net/npm/preact@10.19.3/dist/preact.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/preact@10.19.3/hooks/dist/hooks.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/ruby/ruby.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/markdown/markdown.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/yaml/yaml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/shell/shell.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/erlang/erlang.min.js"></script>
+
+  <script>
+    const { h, render } = preact;
+    const { useState, useEffect, useRef, useCallback, useMemo } = preactHooks;
+    const html = htm.bind(h);
+
+    const BASE = window.location.pathname.replace(/\/$/, '');
+
+    async function api(path, opts) {
+      const o = opts || {};
+      const fetchOpts = o.body
+        ? { method: o.method || 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(o.body) }
+        : { method: o.method || 'GET' };
+      const r = await fetch(BASE + path, fetchOpts);
+      return r.json();
+    }
+
+    /* ─── Menu items ─── */
+    const ICONS = {
+      dashboard: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
+      api: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+      actions: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+      tools: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+      guides: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+      clients: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+      console: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
+      files: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+    };
+
+    const MENU = [
+      { id: 'dashboard', label: 'Dashboard' },
+      { id: 'api', label: 'Api' },
+      { id: 'actions', label: 'Actions' },
+      { id: 'tools', label: 'Tools' },
+      { id: 'guides', label: 'Guides' },
+      { id: 'clients', label: 'Clients' },
+      { id: 'console', label: 'Console' },
+      { id: 'files', label: 'Files' },
+    ];
+
+    /* ─── App ─── */
+    function App() {
+      const [page, setPage] = useState('dashboard');
+      const [editFile, setEditFile] = useState(null);
+      const [editedContent, setEditedContent] = useState('');
+      const [dirty, setDirty] = useState(false);
+      const [saving, setSaving] = useState(false);
+      const [evalResult, setEvalResult] = useState(null);
+      const [runnerAction, setRunnerAction] = useState('');
+      const [runnerParams, setRunnerParams] = useState('{}');
+      const [runnerAuth, setRunnerAuth] = useState('');
+      const [consoleInput, setConsoleInput] = useState('');
+
+      function openFile(fileData) {
+        setEditFile(fileData);
+        setEditedContent(fileData.content);
+        setDirty(false);
+        setEvalResult(null);
+      }
+
+      function closeFile() {
+        setEditFile(null);
+        setEditedContent('');
+        setDirty(false);
+        setEvalResult(null);
+      }
+
+      async function saveFile() {
+        if (!editFile || !dirty) return;
+        setSaving(true);
+        await api('/api/file', { method: 'PUT', body: { path: editFile.path, content: editedContent } });
+        setEditFile({ ...editFile, content: editedContent });
+        setDirty(false);
+        setSaving(false);
+      }
+
+      function onEdit(val) {
+        setEditedContent(val);
+        setDirty(val !== editFile.content);
+      }
+
+      async function evalCode() {
+        const r = await api('/api/eval', { body: { code: editedContent } });
+        setEvalResult(r);
+      }
+
+      function loadToRunner(data) {
+        setRunnerAction(data.action || '');
+        const p = data.params || {};
+        setRunnerParams(Object.keys(p).length ? JSON.stringify(p, null, 2) : '{}');
+        setRunnerAuth(data.auth ? JSON.stringify(data.auth, null, 2) : '');
+        setPage('actions');
+      }
+
+      function toEval(action, paramsJson, authJson) {
+        const code = buildElixirCall(action, paramsJson, authJson);
+        setConsoleInput(code);
+        setPage('console');
+      }
+
+      const showRight = page === 'actions' || editFile;
+
+      return html`
+    <div class="flex flex-1 overflow-hidden h-screen">
+      <!-- Left Menu -->
+      <div class="w-44 border-r border-gray-800 bg-gray-900 flex flex-col shrink-0">
+        <div class="px-4 py-3 border-b border-gray-800 flex items-center gap-2.5">
+          <img src="${BASE}/assets/mooncore.png" alt="Mooncore" class="w-7 h-7 rounded" />
+          <span class="text-sm font-bold text-violet-400">Mooncore</span>
+        </div>
+        <nav class="flex-1 py-2">
+          ${MENU.map(m => html`
+            <button key=${m.id}
+              class="w-full text-left px-4 py-2 text-sm flex items-center gap-2.5 border-none cursor-pointer transition-colors
+                ${page === m.id ? 'bg-violet-500/10 text-violet-400' : 'bg-transparent text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}"
+              onClick=${() => setPage(m.id)}>
+              <span class="w-5 text-center flex items-center justify-center">${ICONS[m.id]}</span>
+              ${m.label}
+            </button>
+          `)}
+        </nav>
+        <div class="px-4 py-3 border-t border-gray-800">
+          <div class="text-xs text-gray-600">Mooncore Dev</div>
+        </div>
+      </div>
+
+      <!-- Center Content -->
+      <div class="flex-1 overflow-y-auto min-w-0">
+        ${page === 'dashboard' && html`<${DashboardPage} />`}
+        ${page === 'api' && html`<${ApiPage} />`}
+        ${page === 'actions' && html`<${RunnerPage} action=${runnerAction} params=${runnerParams} auth=${runnerAuth}
+          setAction=${setRunnerAction} setParams=${setRunnerParams} setAuth=${setRunnerAuth} onToEval=${toEval} />`}
+        ${page === 'tools' && html`<${ToolsPage} />`}
+        ${page === 'guides' && html`<${GuidesPage} />`}
+        ${page === 'clients' && html`<${ClientsPage} />`}
+        ${page === 'console' && html`<${ConsolePage} initialInput=${consoleInput} onConsumeInput=${() => setConsoleInput('')} />`}
+        ${page === 'files' && html`<${FilesPage} onOpenFile=${openFile} />`}
+      </div>
+
+      <!-- Right Panel: action logs on Runner, file editor when file open -->
+      ${showRight && html`
+        <div class="border-l border-gray-800 bg-gray-900 flex flex-col shrink-0 overflow-hidden" style="width: 60%; max-width: 60%">
+          ${editFile
+            ? html`<${EditorPanel} key=${editFile.path} file=${editFile} edited=${editedContent} dirty=${dirty} saving=${saving}
+                evalResult=${evalResult} onEdit=${onEdit} onSave=${saveFile} onClose=${closeFile} onEval=${evalCode} />`
+            : html`<${ActionLogsPanel} onReplay=${loadToRunner} />`
+          }
+        </div>
+      `}
+    </div>
+  `;
+    }
+
+    /* ─── Section header ─── */
+    function SectionHeader({ title, count, actions }) {
+      return html`
+    <div class="px-5 py-3 border-b border-gray-800 flex items-center justify-between bg-gray-900/50">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">${title}</span>
+        ${count != null && html`<span class="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-full">${count}</span>`}
+      </div>
+      ${actions}
+    </div>
+  `;
+    }
+
+    /* ─── Dashboard Page ─── */
+    function fmtBytes(b) {
+      if (b == null) return '0 B';
+      if (b < 1024) return b + ' B';
+      if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+      if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB';
+      return (b / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    }
+
+    function fmtNum(n) {
+      if (n == null) return '0';
+      if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return String(n);
+    }
+
+    function fmtUptime(ms) {
+      const s = Math.floor(ms / 1000);
+      const d = Math.floor(s / 86400);
+      const h = Math.floor((s % 86400) / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
+      if (h > 0) return h + 'h ' + m + 'm';
+      return m + 'm ' + (s % 60) + 's';
+    }
+
+    /* Sparkline SVG — small inline chart */
+    function Sparkline({ data, width = 120, height = 32, color = '#7c3aed' }) {
+      if (!data || data.length < 2) return html`<div style="width:${width}px;height:${height}px"></div> `;
+      const max = Math.max(...data, 1);
+      const min = Math.min(...data);
+      const range = max - min || 1;
+      const pts = data.map((v, i) => {
+        const x = (i / (data.length - 1)) * width;
+        const y = height - ((v - min) / range) * (height - 4) - 2;
+        return x + ',' + y;
+      }).join(' ');
+      const fillPts = pts + ' ' + width + ',' + height + ' 0,' + height;
+      return html`
+      <svg width=${width} height=${height} class="block">
+        <polyline points=${fillPts} fill=${color} fill-opacity="0.1" stroke="none"/>
+        <polyline points=${pts} fill="none" stroke=${color} stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      `;
+    }
+
+    /* Horizontal bar gauge */
+    function Gauge({ value, max, label, used, color = '#7c3aed', warn = 0.8 }) {
+      const pct = max ? Math.min(value / max, 1) : 0;
+      const c = pct > warn ? '#f87171' : pct > warn * 0.8 ? '#fbbf24' : color;
+      return html`
+      <div class="space-y-1">
+        <div class="flex justify-between text-xs">
+          <span class="text-gray-400">${label}</span>
+          <span class="text-gray-500">${used || fmtNum(value)} / ${fmtNum(max)} <span class="text-gray-600">(${(pct * 100).toFixed(1)}%)</span></span>
+        </div>
+        <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-500" style="width:${pct * 100}%;background:${c}"></div>
+        </div>
+      </div>
+      `;
+    }
+
+    /* Memory bar (horizontal, labeled) */
+    function MemBar({ label, bytes, total, color }) {
+      const pct = total ? (bytes / total * 100) : 0;
+      return html`
+      <div class="flex items-center gap-3 py-1">
+        <span class="text-xs text-gray-500 w-20 shrink-0">${label}</span>
+        <div class="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-500" style="width:${Math.max(pct, 0.5)}%;background:${color}"></div>
+        </div>
+        <span class="text-xs text-gray-400 w-20 text-right shrink-0">${fmtBytes(bytes)}</span>
+      </div>
+      `;
+    }
+
+    function DashboardPage() {
+      const [data, setData] = useState(null);
+      const [history, setHistory] = useState({ mem: [], cpu: [], procs: [], reductions: [] });
+      const [prevSnap, setPrevSnap] = useState(null);
+      const [cpuPct, setCpuPct] = useState([]);
+      const [cpuRatio, setCpuRatio] = useState(0);
+      const [tab, setTab] = useState('overview'); // overview | processes | ets | apps
+      const intervalRef = useRef(null);
+      const MAX_HIST = 30;
+
+      const fetchData = useCallback(async () => {
+        try {
+          const d = await api('/api/dashboard');
+          setData(d);
+
+          // Calculate per-scheduler CPU % from wall time deltas
+          if (d.schedulers && d.schedulers.length > 0) {
+            setPrevSnap(prev => {
+              if (prev && prev.scheds && prev.scheds.length === d.schedulers.length) {
+                const pcts = d.schedulers.map((s, i) => {
+                  const da = s.active - prev.scheds[i].active;
+                  const dt = s.total - prev.scheds[i].total;
+                  return dt > 0 ? (da / dt) * 100 : 0;
+                });
+                setCpuPct(pcts);
+              }
+              // CPU runtime ratio delta (instant utilization)
+              if (prev && prev.runtime != null) {
+                const dr = d.vm.runtime_ms - prev.runtime;
+                const dw = d.vm.uptime_ms - prev.uptime;
+                const ratio = dw > 0 ? (dr / dw) * 100 : 0;
+                setCpuRatio(ratio);
+                setHistory(h => ({
+                  ...h,
+                  cpu: [...h.cpu.slice(-(MAX_HIST - 1)), ratio]
+                }));
+              }
+              return { scheds: d.schedulers, runtime: d.vm.runtime_ms, uptime: d.vm.uptime_ms };
+            });
+          }
+
+          // Update history
+          setHistory(h => ({
+            ...h,
+            mem: [...h.mem.slice(-(MAX_HIST - 1)), d.memory.total],
+            procs: [...h.procs.slice(-(MAX_HIST - 1)), d.vm.process_count],
+            reductions: [...h.reductions.slice(-(MAX_HIST - 1)), d.vm.reductions]
+          }));
+        } catch (e) { }
+      }, []);
+
+      useEffect(() => {
+        fetchData();
+        intervalRef.current = setInterval(fetchData, 2000);
+        return () => clearInterval(intervalRef.current);
+      }, [fetchData]);
+
+      if (!data) return html`<div class="flex-1 flex flex-col items-center justify-center opacity-40">
+        <img src="${BASE}/assets/mooncore.png" alt="Mooncore" class="w-16 h-16 rounded-lg mb-4 animate-pulse" />
+        <span class="text-xs text-gray-500">Loading dashboard...</span>
+      </div>`;
+
+      const { memory, vm, top_processes, ets_tables, applications } = data;
+      const avgCpu = cpuRatio;
+
+      const tabs = [
+        { id: 'overview', label: 'Overview' },
+        { id: 'processes', label: 'Processes (' + (top_processes || []).length + ')' },
+        { id: 'ets', label: 'ETS (' + (ets_tables || []).length + ')' },
+        { id: 'apps', label: 'Apps (' + (applications || []).length + ')' },
+      ];
+
+      return html`
+      <div class="h-full flex flex-col">
+      <div class="px-5 py-3 border-b border-gray-800 flex items-center gap-3 bg-gray-900/50">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Dashboard</span>
+        <span class="text-xs text-gray-600">Elixir ${vm.elixir_version} / OTP ${vm.otp_release}</span>
+        <span class="text-xs text-gray-600">${vm.system_architecture}</span>
+        <span class="text-xs text-gray-600 ml-auto">uptime ${fmtUptime(vm.uptime_ms)}</span>
+      </div>
+      <div class="flex border-b border-gray-800 px-3 shrink-0">
+        ${tabs.map(t => html`
+          <button key=${t.id}
+            class="px-3 py-2 text-xs border-none cursor-pointer transition-colors
+              ${tab === t.id ? 'text-violet-400 bg-transparent' : 'text-gray-500 hover:text-gray-300 bg-transparent'}"
+            style=${tab === t.id ? 'box-shadow: inset 0 -2px 0 #7c3aed' : ''}
+            onClick=${() => setTab(t.id)}>${t.label}</button>
+        `)}
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        ${tab === 'overview' && html`<${DashOverview} data=${data} history=${history} cpuPct=${cpuPct} avgCpu=${avgCpu} />`}
+        ${tab === 'processes' && html`<${DashProcesses} procs=${top_processes} />`}
+        ${tab === 'ets' && html`<${DashEts} tables=${ets_tables} />`}
+        ${tab === 'apps' && html`<${DashApps} apps=${applications} />`}
+      </div>
+    </div>
+      `;
+    }
+
+    function DashOverview({ data, history, cpuPct, avgCpu }) {
+      const { memory, vm } = data;
+      const memColors = { processes: '#7c3aed', binary: '#06b6d4', ets: '#f59e0b', atom: '#10b981', code: '#f87171' };
+
+      return html`
+      <div class="p-5 space-y-6">
+      <!--Top stat cards-->
+      <div class="grid grid-cols-4 gap-4">
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-500">Total Memory</span>
+            <${Sparkline} data=${history.mem} color="#7c3aed" />
+          </div>
+          <div class="text-xl font-bold text-gray-200">${fmtBytes(memory.total)}</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-500">CPU Runtime</span>
+            <${Sparkline} data=${history.cpu} color="#06b6d4" />
+          </div>
+          <div class="text-xl font-bold text-gray-200">${avgCpu.toFixed(1)}<span class="text-sm text-gray-500">%</span></div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-500">Processes</span>
+            <${Sparkline} data=${history.procs} color="#10b981" />
+          </div>
+          <div class="text-xl font-bold text-gray-200">${fmtNum(vm.process_count)}</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-500">Reductions</span>
+            <${Sparkline} data=${history.reductions} color="#f59e0b" />
+          </div>
+          <div class="text-xl font-bold text-gray-200">${fmtNum(vm.reductions)}</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-6">
+        <!-- Memory breakdown -->
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Memory Breakdown</div>
+          <${MemBar} label="Processes" bytes=${memory.processes} total=${memory.total} color=${memColors.processes} />
+          <${MemBar} label="Binary" bytes=${memory.binary} total=${memory.total} color=${memColors.binary} />
+          <${MemBar} label="ETS" bytes=${memory.ets} total=${memory.total} color=${memColors.ets} />
+          <${MemBar} label="Atom" bytes=${memory.atom} total=${memory.total} color=${memColors.atom} />
+          <${MemBar} label="Code" bytes=${memory.code} total=${memory.total} color=${memColors.code} />
+        </div>
+
+        <!-- Scheduler utilization -->
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            Schedulers <span class="text-gray-600">(${vm.schedulers} online / ${vm.logical_processors} cores)</span>
+          </div>
+          ${cpuPct.length > 0 ? html`
+            <div class="grid gap-1.5" style="grid-template-columns: repeat(auto-fill, minmax(52px, 1fr))">
+              ${cpuPct.map((pct, i) => {
+        const bg = pct > 80 ? '#f87171' : pct > 50 ? '#fbbf24' : '#06b6d4';
+        const textC = pct > 80 ? 'text-red-400' : pct > 50 ? 'text-amber-400' : 'text-gray-400';
+        return html`
+                <div key=${i} class="bg-gray-800 rounded p-1.5 text-center relative overflow-hidden" title="Scheduler ${i + 1}: ${pct.toFixed(1)}%">
+                  <div class="absolute bottom-0 left-0 right-0 transition-all duration-700 rounded-b" style="height:${Math.max(pct, 1)}%;background:${bg};opacity:0.25"></div>
+                  <div class="relative text-xs font-mono ${textC}" style="font-size:10px">${pct.toFixed(0)}<span class="text-gray-600">%</span></div>
+                  <div class="relative text-gray-600" style="font-size:8px">${i + 1}</div>
+                </div>`;
+      })}
+            </div>
+          ` : html`<div class="text-xs text-gray-600">Collecting scheduler data...</div>`}
+        </div>
+      </div>
+
+      <!--VM Limits-->
+      <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">VM Limits</div>
+        <div class="grid grid-cols-2 gap-x-6 gap-y-2">
+          <${Gauge} label="Processes" value=${vm.process_count} max=${vm.process_limit} color="#7c3aed" />
+          <${Gauge} label="Atoms" value=${vm.atom_count} max=${vm.atom_limit} color="#10b981" />
+          <${Gauge} label="Ports" value=${vm.port_count} max=${vm.port_limit} color="#06b6d4" />
+          <${Gauge} label="ETS Tables" value=${vm.ets_count} max=${vm.ets_limit} color="#f59e0b" />
+        </div>
+      </div>
+
+      <!--Quick stats row-->
+      <div class="grid grid-cols-3 gap-4">
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-3">
+          <span class="text-xs text-gray-500">Runtime</span>
+          <div class="text-sm font-mono text-gray-300 mt-1">${fmtUptime(vm.runtime_ms)}</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-3">
+          <span class="text-xs text-gray-500">CPU Runtime Ratio</span>
+          <div class="text-sm font-mono text-gray-300 mt-1">${vm.uptime_ms > 0 ? (vm.runtime_ms / vm.uptime_ms * 100).toFixed(2) : 0}%</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-3">
+          <span class="text-xs text-gray-500">ETS Tables</span>
+          <div class="text-sm font-mono text-gray-300 mt-1">${vm.ets_count} <span class="text-gray-600">/ ${fmtBytes(memory.ets)}</span></div>
+        </div>
+      </div>
+    </div>
+      `;
+    }
+
+    function DashProcesses({ procs }) {
+      return html`
+      <div >
+      <table>
+        <thead>
+          <tr class="border-b border-gray-800 bg-gray-900/50">
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Name / PID</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium text-right">Memory</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium text-right">MQ</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium text-right">Reductions</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Status</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Current Function</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(procs || []).map((p, i) => html`
+            <tr key=${i} class="border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors">
+              <td class="px-4 py-2">
+                <div class="text-xs font-mono ${p.name ? 'text-violet-400' : 'text-gray-500'}">${p.name || p.pid}</div>
+                ${p.name && html`<div class="text-xs text-gray-600 font-mono">${p.pid}</div>`}
+              </td>
+              <td class="px-4 py-2 text-xs text-gray-300 text-right font-mono">${fmtBytes(p.memory)}</td>
+              <td class="px-4 py-2 text-xs text-right font-mono ${p.mq_len > 0 ? (p.mq_len > 100 ? 'text-red-400' : 'text-amber-400') : 'text-gray-500'}">${p.mq_len}</td>
+              <td class="px-4 py-2 text-xs text-gray-400 text-right font-mono">${fmtNum(p.reductions)}</td>
+              <td class="px-4 py-2">
+                <span class="text-xs px-1.5 py-0.5 rounded ${p.status === 'running' ? 'bg-emerald-500/15 text-emerald-400' : p.status === 'waiting' ? 'bg-gray-800 text-gray-500' : 'bg-amber-500/15 text-amber-400'}">${p.status}</span>
+              </td>
+              <td class="px-4 py-2 text-xs text-gray-500 font-mono truncate max-w-xs">${p.current_fn || '-'}</td>
+            </tr>
+          `)}
+        </tbody>
+      </table>
+    </div>
+      `;
+    }
+
+    function DashEts({ tables }) {
+      const totalMem = (tables || []).reduce((s, t) => s + t.memory, 0);
+      const totalRows = (tables || []).reduce((s, t) => s + t.size, 0);
+      return html`
+      <div >
+      <div class="px-4 py-2 border-b border-gray-800 flex items-center gap-3 bg-gray-900/30">
+        <span class="text-xs text-gray-500">Total: ${fmtBytes(totalMem)}</span>
+        <span class="text-xs text-gray-500">${fmtNum(totalRows)} rows</span>
+      </div>
+      <table>
+        <thead>
+          <tr class="border-b border-gray-800 bg-gray-900/50">
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Name</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium text-right">Rows</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium text-right">Memory</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(tables || []).map((t, i) => html`
+            <tr key=${i} class="border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors">
+              <td class="px-4 py-2">
+                <div class="text-xs font-mono text-violet-400">${t.name}</div>
+              </td>
+              <td class="px-4 py-2 text-xs text-gray-300 text-right font-mono">${fmtNum(t.size)}</td>
+              <td class="px-4 py-2 text-xs text-gray-300 text-right font-mono">${fmtBytes(t.memory)}</td>
+              <td class="px-4 py-2 text-xs text-gray-500">${t.type}</td>
+            </tr>
+          `)}
+        </tbody>
+      </table>
+    </div>
+      `;
+    }
+
+    function DashApps({ apps }) {
+      return html`
+      <div >
+      <table>
+        <thead>
+          <tr class="border-b border-gray-800 bg-gray-900/50">
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Application</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Version</th>
+            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(apps || []).map((a, i) => html`
+            <tr key=${i} class="border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors">
+              <td class="px-4 py-2 text-xs font-mono text-violet-400">${a.name}</td>
+              <td class="px-4 py-2 text-xs text-gray-400 font-mono">${a.version}</td>
+              <td class="px-4 py-2 text-xs text-gray-500">${a.description}</td>
+            </tr>
+          `)}
+        </tbody>
+      </table>
+    </div>
+      `;
+    }
+
+    /* ─── Api Page (actions list) ─── */
+    function ApiPage() {
+      const [actions, setActions] = useState([]);
+      const [apps, setApps] = useState([]);
+      const [loading, setLoading] = useState(true);
+      useEffect(() => {
+        Promise.all([
+          api('/api/actions').then(d => d.actions || []),
+          api('/api/apps').then(d => d.apps || [])
+        ]).then(([a, ap]) => { setActions(a); setApps(ap); setLoading(false); });
+      }, []);
+      if (loading) return html`<div class="p-8"> <span class="spinner"></span></div> `;
+
+      // Group actions by app
+      const appMap = {};
+      apps.forEach(a => { appMap[a.key] = a; });
+      const grouped = {};
+      actions.forEach(a => {
+        const key = a.app || 'unknown';
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(a);
+      });
+
+      return html`
+      <div class="h-full flex flex-col">
+      <${SectionHeader} title="Api" count=${actions.length} />
+      <div class="flex-1 overflow-y-auto">
+        ${Object.entries(grouped).map(([appKey, appActions]) => {
+        const app = appMap[appKey];
+        return html`
+            <div key=${appKey}>
+              <div class="px-5 py-2 bg-gray-900/30 border-b border-gray-800 flex items-center gap-3">
+                <span class="text-xs font-semibold text-gray-300">${app ? app.name : appKey}</span>
+                <span class="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-full">${appActions.length}</span>
+                ${app && html`<span class="text-xs text-gray-600 font-mono">${app.action_module}</span>`}
+                ${app && app.roles && app.roles.length > 0 && html`
+                  <span class="text-xs text-gray-600">roles: ${app.roles.join(', ')}</span>
+                `}
+              </div>
+              <table>
+                <tbody>
+                  ${appActions.map(a => html`
+                    <tr class="border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors">
+                      <td class="px-5 py-2.5"><code class="text-violet-400 text-xs">${a.action}</code></td>
+                      <td class="px-5 py-2.5 text-xs text-gray-600 font-mono">${a.handler}</td>
+                      <td class="px-5 py-2.5">
+                        ${a.public
+            ? html`<span class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">public</span>`
+            : html`<span class="text-xs px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">${(a.roles || []).join(', ')}</span>`}
+                      </td>
+                    </tr>
+                  `)}
+                </tbody>
+              </table>
+            </div>
+          `;
+      })}
+      </div>
+    </div>
+      `;
+    }
+
+    /* ─── Runner Page ─── */
+    /* ─── JSON to Elixir map converter ─── */
+    function jsonToElixir(val) {
+      if (val === null || val === undefined) return 'nil';
+      if (typeof val === 'boolean') return val ? 'true' : 'false';
+      if (typeof val === 'number') return String(val);
+      if (typeof val === 'string') return '"' + val.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+      if (Array.isArray(val)) return '[' + val.map(jsonToElixir).join(', ') + ']';
+      if (typeof val === 'object') {
+        const entries = Object.entries(val).map(([k, v]) => '"' + k + '" => ' + jsonToElixir(v));
+        return '%{' + entries.join(', ') + '}';
+      }
+      return 'nil';
+    }
+
+    function buildElixirCall(action, paramsJson, authJson) {
+      let p = {};
+      try { p = JSON.parse(paramsJson); } catch (e) { p = {}; }
+      let req = '%{params: ' + jsonToElixir(p) + '}';
+      if (authJson && authJson.trim()) {
+        let a = null;
+        try { a = JSON.parse(authJson); } catch (e) { }
+        if (a) req = '%{params: ' + jsonToElixir(p) + ', auth: ' + jsonToElixir(a) + '}';
+      }
+      return 'Mooncore.Action.execute("' + action + '", ' + req + ')';
+    }
+
+    function RunnerPage({ action, params, auth, setAction, setParams, setAuth, onToEval }) {
+      const [result, setResult] = useState(null);
+      const [loading, setLoading] = useState(false);
+
+      async function run() {
+        setLoading(true);
+        let p = {}, a = null;
+        try { p = JSON.parse(params); } catch (e) { setResult({ error: 'Invalid params JSON' }); setLoading(false); return; }
+        if (auth.trim()) { try { a = JSON.parse(auth); } catch (e) { setResult({ error: 'Invalid auth JSON' }); setLoading(false); return; } }
+        const r = await api('/api/action', { body: { action, params: p, auth: a } });
+        setResult(r);
+        setLoading(false);
+      }
+
+      const ic = 'w-full px-3 py-2 bg-gray-950 border border-gray-800 text-sm text-gray-200';
+
+      return html`
+      <div class="h-full flex flex-col">
+      <${SectionHeader} title="Run Action" />
+      <div class="flex-1 overflow-y-auto">
+        <div class="p-5 space-y-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Action</label>
+            <input class=${ic} value=${action} onInput=${e => setAction(e.target.value)} placeholder="task.create" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Params (JSON)</label>
+            <textarea class=${ic} rows="6" value=${params} onInput=${e => setParams(e.target.value)}></textarea>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Auth (JSON, optional)</label>
+            <textarea class=${ic} rows="2" value=${auth} onInput=${e => setAuth(e.target.value)}
+              placeholder='{"roles":["user"]}'></textarea>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm rounded cursor-pointer border-none transition-colors"
+              onClick=${run} disabled=${loading}>
+              ${loading ? html`<span class="spinner mr-1"></span>` : ''} Run
+            </button>
+            <button class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded cursor-pointer border-none transition-colors"
+              onClick=${() => onToEval(action, params, auth)}>
+              → To Eval
+            </button>
+          </div>
+        </div>
+        ${result != null && html`
+          <div class="border-t border-gray-800">
+            <div class="px-5 py-3 bg-gray-900/50">
+              <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Result</span>
+            </div>
+            <pre class="text-xs text-gray-300 px-5 pb-5 overflow-auto whitespace-pre-wrap">${JSON.stringify(result, null, 2)}</pre>
+          </div>
+        `}
+      </div>
+    </div>
+      `;
+    }
+
+    /* ─── Tools Page ─── */
+    function ToolsPage() {
+      const [tab, setTab] = useState('json');
+      const tabs = [
+        { id: 'json', label: 'JSON \u2194 Elixir' },
+        { id: 'jwt', label: 'JWT Token' },
+        { id: 'base64', label: 'Base64' },
+        { id: 'timestamp', label: 'Timestamps' },
+        { id: 'inspect', label: 'Inspect' },
+      ];
+      return html`
+      <div class="h-full flex flex-col">
+      <${SectionHeader} title="Tools" />
+      <div class="flex border-b border-gray-800 px-3 shrink-0">
+        ${tabs.map(t => html`
+          <button key=${t.id}
+            class="px-3 py-2 text-xs border-none cursor-pointer transition-colors
+              ${tab === t.id ? 'text-violet-400 border-b-2 border-violet-400 bg-transparent' : 'text-gray-500 hover:text-gray-300 bg-transparent'}"
+            style=${tab === t.id ? 'box-shadow: inset 0 -2px 0 #7c3aed' : ''}
+            onClick=${() => setTab(t.id)}>${t.label}</button>
+        `)}
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        ${tab === 'json' && html`<${ToolJsonElixir} />`}
+        ${tab === 'jwt' && html`<${ToolJwt} />`}
+        ${tab === 'base64' && html`<${ToolBase64} />`}
+        ${tab === 'timestamp' && html`<${ToolTimestamp} />`}
+        ${tab === 'inspect' && html`<${ToolInspect} />`}
+      </div>
+    </div>
+      `;
+    }
+
+    /* ── Tool: JSON <-> Elixir Map ── */
+    function elixirToJson(str) {
+      // Basic Elixir map/list to JSON conversion
+      let s = str.trim();
+      // %{} -> {}
+      s = s.replace(/%\{/g, '{');
+      // atom keys like foo: val -> "foo": val
+      s = s.replace(/(\{|,)\s*([a-z_][a-z0-9_?!]*)\s*:/g, '$1 "$2":');
+      // string keys "key" => val -> "key": val
+      s = s.replace(/=>/g, ':');
+      // nil -> null
+      s = s.replace(/\bnil\b/g, 'null');
+      // :atom_values -> "atom_values"
+      s = s.replace(/:([a-z_][a-z0-9_?!]*)/g, '"$1"');
+      // true/false stay the same
+      return s;
+    }
+
+    function ToolJsonElixir() {
+      const [left, setLeft] = useState('{\n  "name": "Alice",\n  "age": 30,\n  "active": true\n}');
+      const [right, setRight] = useState('');
+      const [direction, setDirection] = useState('toElixir'); // toElixir | toJson
+
+      function convertToElixir() {
+        try {
+          const parsed = JSON.parse(left);
+          setRight(jsonToElixir(parsed));
+          setDirection('toElixir');
+        } catch (e) {
+          setRight('# Error: ' + e.message);
+        }
+      }
+
+      function convertToJson() {
+        try {
+          const result = elixirToJson(left);
+          // Try to parse & pretty-print
+          const parsed = JSON.parse(result);
+          setRight(JSON.stringify(parsed, null, 2));
+          setDirection('toJson');
+        } catch (e) {
+          setRight('# Error: ' + e.message);
+        }
+      }
+
+      const ta = 'w-full px-3 py-2 bg-gray-950 border border-gray-800 text-xs text-gray-200 font-mono resize-none';
+
+      return html`
+      <div class="p-5 space-y-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Input</label>
+          <textarea class=${ta} rows="8" value=${left} onInput=${e => setLeft(e.target.value)}
+            placeholder='Paste JSON or Elixir map...'></textarea>
+        </div>
+        <div class="flex gap-2">
+          <button class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded cursor-pointer border-none"
+            onClick=${convertToElixir}>JSON \u2192 Elixir Map</button>
+          <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none"
+            onClick=${convertToJson}>Elixir Map \u2192 JSON</button>
+          ${right && html`
+            <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none ml-auto"
+              onClick=${() => navigator.clipboard.writeText(right)}>Copy</button>
+          `}
+        </div>
+        ${right && html`
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">${direction === 'toElixir' ? 'Elixir Map' : 'JSON'}</label>
+            <pre class="bg-gray-950 border border-gray-800 p-3 text-xs font-mono whitespace-pre-wrap text-emerald-400 overflow-x-auto">${right}</pre>
+          </div>
+        `}
+      </div>
+      `;
+    }
+
+    /* ── Tool: JWT Token ── */
+    function ToolJwt() {
+      const [mode, setMode] = useState('create'); // create | decode
+      const [claims, setClaims] = useState('{\n  "user": "alice",\n  "app": "myapp",\n  "roles": ["admin"]\n}');
+      const [token, setToken] = useState('');
+      const [result, setResult] = useState(null);
+      const [loading, setLoading] = useState(false);
+
+      async function createToken() {
+        setLoading(true);
+        try {
+          const parsed = JSON.parse(claims);
+          const claimsStr = jsonToElixir(parsed);
+          const code = 'Mooncore.Auth.Token.new_token(' + claimsStr + ')';
+          const r = await api('/api/eval', { body: { code } });
+          setResult(r);
+          if (r.ok) {
+            // Extract token string from {:ok, "token..."} result
+            const m = r.result.match(/"([^"]+)"/);
+            if (m) setToken(m[1]);
+          }
+        } catch (e) {
+          setResult({ ok: false, error: 'Invalid JSON: ' + e.message });
+        }
+        setLoading(false);
+      }
+
+      async function decodeToken() {
+        if (!token.trim()) return;
+        setLoading(true);
+        const code = 'Mooncore.Auth.Token.solve("' + token.trim().replace(/"/g, '\\"') + '")';
+        const r = await api('/api/eval', { body: { code } });
+        setResult(r);
+        setLoading(false);
+      }
+
+      function decodePayload() {
+        if (!token.trim()) return;
+        try {
+          const parts = token.trim().split('.');
+          if (parts.length !== 3) { setResult({ ok: false, error: 'Invalid JWT format (expected 3 parts)' }); return; }
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          // Check expiry
+          if (payload.exp) {
+            const now = Math.floor(Date.now() / 1000);
+            payload._expired = payload.exp < now;
+            payload._exp_human = new Date(payload.exp * 1000).toISOString();
+          }
+          if (payload.iat) payload._iat_human = new Date(payload.iat * 1000).toISOString();
+          setResult({ ok: true, result: JSON.stringify(payload, null, 2) });
+        } catch (e) {
+          setResult({ ok: false, error: 'Failed to decode: ' + e.message });
+        }
+      }
+
+      const ta = 'w-full px-3 py-2 bg-gray-950 border border-gray-800 text-xs text-gray-200 font-mono resize-none';
+
+      return html`
+      <div class="p-5 space-y-4">
+        <div class="flex gap-2">
+          <button class="px-3 py-1.5 text-xs rounded cursor-pointer border-none transition-colors
+            ${mode === 'create' ? 'bg-violet-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}"
+            onClick=${() => setMode('create')}>Create Token</button>
+          <button class="px-3 py-1.5 text-xs rounded cursor-pointer border-none transition-colors
+            ${mode === 'decode' ? 'bg-violet-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}"
+            onClick=${() => setMode('decode')}>Decode Token</button>
+        </div>
+
+        ${mode === 'create' && html`
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Claims (JSON)</label>
+              <textarea class=${ta} rows="6" value=${claims} onInput=${e => setClaims(e.target.value)}></textarea>
+              <div class="text-xs text-gray-600 mt-1">Keys: user, app, dkey, scope, roles (list)</div>
+            </div>
+            <button class="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded cursor-pointer border-none"
+              onClick=${createToken} disabled=${loading}>
+              ${loading ? html`<span class="spinner mr-1"></span>` : ''} Create
+            </button>
+            ${token && html`
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <label class="text-xs text-gray-500">Token</label>
+                  <button class="text-xs text-gray-600 hover:text-gray-300 bg-transparent border-none cursor-pointer"
+                    onClick=${() => navigator.clipboard.writeText(token)}>Copy</button>
+                </div>
+                <pre class="bg-gray-950 border border-gray-800 p-3 text-xs font-mono text-violet-400 break-all whitespace-pre-wrap">${token}</pre>
+              </div>
+            `}
+          </div>
+        `}
+
+        ${mode === 'decode' && html`
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">JWT Token</label>
+              <textarea class=${ta} rows="4" value=${token} onInput=${e => setToken(e.target.value)}
+                placeholder="eyJhbGciOiJSUzI1NiIs..."></textarea>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded cursor-pointer border-none"
+                onClick=${decodeToken} disabled=${loading}>
+                ${loading ? html`<span class="spinner mr-1"></span>` : ''} Verify \u0026 Decode
+              </button>
+              <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none"
+                onClick=${decodePayload}>Decode Payload (no verify)</button>
+            </div>
+          </div>
+        `}
+
+        ${result && html`
+          <div class="border-t border-gray-800 pt-3">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-semibold ${result.ok ? 'text-emerald-400' : 'text-red-400'}">
+                ${result.ok ? '\u2713 Result' : '\u2717 Error'}
+              </span>
+              ${result.ok && html`
+                <button class="text-xs text-gray-600 hover:text-gray-300 bg-transparent border-none cursor-pointer"
+                  onClick=${() => navigator.clipboard.writeText(result.result)}>Copy</button>
+              `}
+            </div>
+            <pre class="bg-gray-950 border border-gray-800 p-3 text-xs font-mono whitespace-pre-wrap ${result.ok ? 'text-emerald-400' : 'text-red-400'}">${result.ok ? result.result : result.error}</pre>
+          </div>
+        `}
+      </div>
+      `;
+    }
+
+    /* ── Tool: Base64 ── */
+    function ToolBase64() {
+      const [input, setInput] = useState('');
+      const [output, setOutput] = useState('');
+
+      function encode() { try { setOutput(btoa(input)); } catch (e) { setOutput('Error: ' + e.message); } }
+      function decode() { try { setOutput(atob(input)); } catch (e) { setOutput('Error: ' + e.message); } }
+      function encodeUrl() { try { setOutput(btoa(input).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')); } catch (e) { setOutput('Error: ' + e.message); } }
+      function decodeUrl() { try { let s = input.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; setOutput(atob(s)); } catch (e) { setOutput('Error: ' + e.message); } }
+
+      const ta = 'w-full px-3 py-2 bg-gray-950 border border-gray-800 text-xs text-gray-200 font-mono resize-none';
+
+      return html`
+      <div class="p-5 space-y-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Input</label>
+          <textarea class=${ta} rows="5" value=${input} onInput=${e => setInput(e.target.value)}></textarea>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded cursor-pointer border-none" onClick=${encode}>Encode</button>
+          <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none" onClick=${decode}>Decode</button>
+          <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none" onClick=${encodeUrl}>URL-safe Encode</button>
+          <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none" onClick=${decodeUrl}>URL-safe Decode</button>
+          ${output && html`
+            <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none ml-auto"
+              onClick=${() => navigator.clipboard.writeText(output)}>Copy</button>
+          `}
+        </div>
+        ${output && html`
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Output</label>
+            <pre class="bg-gray-950 border border-gray-800 p-3 text-xs font-mono whitespace-pre-wrap text-emerald-400 break-all">${output}</pre>
+          </div>
+        `}
+      </div>
+      `;
+    }
+
+    /* ── Tool: Timestamps ── */
+    function ToolTimestamp() {
+      const [unix, setUnix] = useState('');
+      const [iso, setIso] = useState('');
+      const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+
+      useEffect(() => { const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000); return () => clearInterval(t); }, []);
+
+      function fromUnix() {
+        const n = parseInt(unix, 10);
+        if (isNaN(n)) { setIso('Invalid number'); return; }
+        // Auto-detect seconds vs milliseconds
+        const ts = n > 1e12 ? n : n * 1000;
+        setIso(new Date(ts).toISOString());
+      }
+      function fromIso() {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) { setUnix('Invalid date'); return; }
+        setUnix(String(Math.floor(d.getTime() / 1000)));
+      }
+      function setNowValues() { const n = Math.floor(Date.now() / 1000); setUnix(String(n)); setIso(new Date(n * 1000).toISOString()); }
+
+      const ic = 'w-full px-3 py-2 bg-gray-950 border border-gray-800 text-xs text-gray-200 font-mono';
+
+      return html`
+      <div class="p-5 space-y-4">
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-gray-500">Now:</span>
+          <code class="text-xs text-violet-400">${now}</code>
+          <span class="text-xs text-gray-600">(${new Date(now * 1000).toISOString()})</span>
+          <button class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs rounded cursor-pointer border-none"
+            onClick=${setNowValues}>Use now</button>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Unix Timestamp</label>
+            <input class=${ic} value=${unix} onInput=${e => setUnix(e.target.value)} placeholder="1711929600" />
+            <button class="mt-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded cursor-pointer border-none"
+              onClick=${fromUnix}>\u2192 to ISO</button>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">ISO 8601 / Date string</label>
+            <input class=${ic} value=${iso} onInput=${e => setIso(e.target.value)} placeholder="2026-04-01T00:00:00Z" />
+            <button class="mt-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded cursor-pointer border-none"
+              onClick=${fromIso}>\u2192 to Unix</button>
+          </div>
+        </div>
+      </div>
+      `;
+    }
+
+    /* ── Tool: Inspect (eval & inspect Elixir terms) ── */
+    function ToolInspect() {
+      const [code, setCode] = useState('');
+      const [result, setResult] = useState(null);
+      const [loading, setLoading] = useState(false);
+
+      async function inspect() {
+        if (!code.trim()) return;
+        setLoading(true);
+        const wrapped = code.trim() + ' |> inspect(pretty: true, limit: :infinity)';
+        const r = await api('/api/eval', { body: { code: wrapped } });
+        setResult(r);
+        setLoading(false);
+      }
+
+      async function typeOf() {
+        if (!code.trim()) return;
+        setLoading(true);
+        const wrapped = 'val = ' + code.trim() + '\n[type: val.__struct__] rescue [type: "#{is_map(val) && "map" || is_list(val) && "list" || is_binary(val) && "binary" || is_integer(val) && "integer" || is_float(val) && "float" || is_atom(val) && "atom" || is_tuple(val) && "tuple" || is_pid(val) && "pid" || "other"}", byte_size: (is_binary(val) && byte_size(val)) || nil, length: (is_list(val) && length(val)) || (is_map(val) && map_size(val)) || nil] |> Enum.reject(fn {_, v} -> is_nil(v) end) |> inspect()';
+        const r = await api('/api/eval', { body: { code: wrapped } });
+        setResult(r);
+        setLoading(false);
+      }
+
+      const ta = 'w-full px-3 py-2 bg-gray-950 border border-gray-800 text-xs text-gray-200 font-mono resize-none';
+
+      return html`
+      <div class="p-5 space-y-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Elixir Expression</label>
+          <textarea class=${ta} rows="4" value=${code} onInput=${e => setCode(e.target.value)}
+            placeholder='%{hello: "world"} |> Map.keys()'></textarea>
+        </div>
+        <div class="flex gap-2">
+          <button class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded cursor-pointer border-none"
+            onClick=${inspect} disabled=${loading}>
+            ${loading ? html`<span class="spinner mr-1"></span>` : ''} Inspect</button>
+          <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none"
+            onClick=${typeOf} disabled=${loading}>Type Info</button>
+          ${result && result.ok && html`
+            <button class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded cursor-pointer border-none ml-auto"
+              onClick=${() => navigator.clipboard.writeText(result.result)}>Copy</button>
+          `}
+        </div>
+        ${result && html`
+          <div>
+            <pre class="bg-gray-950 border border-gray-800 p-3 text-xs font-mono whitespace-pre-wrap ${result.ok ? 'text-emerald-400' : 'text-red-400'}">${result.ok ? result.result : result.error}</pre>
+          </div>
+        `}
+      </div>
+      `;
+    }
+
+    /* ─── Clients Page (connected sockets, rooms/channels, members) ─── */
+    function ClientsPage() {
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [autoRefresh, setAutoRefresh] = useState(true);
+      const [expanded, setExpanded] = useState({});
+      const intervalRef = useRef(null);
+
+      const fetchData = useCallback(async () => {
+        try {
+          const d = await api('/api/clients');
+          setData(d);
+        } catch (e) { }
+        setLoading(false);
+      }, []);
+
+      useEffect(() => { fetchData(); }, []);
+      useEffect(() => {
+        if (autoRefresh) { intervalRef.current = setInterval(fetchData, 3000); }
+        return () => clearInterval(intervalRef.current);
+      }, [autoRefresh, fetchData]);
+
+      function toggleGroup(group) {
+        setExpanded(prev => ({ ...prev, [group]: !prev[group] }));
+      }
+
+      if (loading) return html`<div class="p-8"> <span class="spinner"></span></div> `;
+
+      const groups = (data && data.groups) || [];
+      const totalClients = groups.reduce((s, g) => s + g.total, 0);
+      const totalChannels = groups.reduce((s, g) => s + g.channels.length, 0);
+
+      return html`
+      <div class="h-full flex flex-col">
+      <div class="px-5 py-3 border-b border-gray-800 flex items-center justify-between bg-gray-900/50">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Connected Clients</span>
+          <span class="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-full">${totalClients} connections</span>
+          <span class="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-full">${totalChannels} channels</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="text-xs text-gray-600 hover:text-gray-400 bg-transparent border-none cursor-pointer"
+            onClick=${() => setAutoRefresh(!autoRefresh)}>
+            ${autoRefresh ? '\u23F8' : '\u25B6'}
+          </button>
+          <button class="text-xs text-gray-600 hover:text-gray-400 bg-transparent border-none cursor-pointer"
+            onClick=${fetchData}>Refresh</button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        ${data && data.error && html`
+          <div class="px-5 py-3 text-xs text-amber-400">${data.error}</div>
+        `}
+        ${groups.length === 0 && !data?.error && html`
+          <div class="p-5 text-sm text-gray-600">No connected clients.</div>
+        `}
+        ${groups.map(g => {
+        const isOpen = expanded[g.group] !== false; // default open
+        return html`
+            <div key=${g.group} class="border-b border-gray-800">
+              <div class="log-expand px-5 py-2.5 flex items-center gap-2 bg-gray-900/30 hover:bg-gray-800/30"
+                onClick=${() => toggleGroup(g.group)}>
+                <span class="text-xs text-gray-600 w-3">${isOpen ? '\u25BE' : '\u25B8'}</span>
+                <span class="text-sm font-semibold text-gray-300 flex-1">${g.group}</span>
+                <span class="text-xs bg-violet-500/15 text-violet-400 px-1.5 py-0.5 rounded-full">${g.total} pid${g.total !== 1 ? 's' : ''}</span>
+                <span class="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-full">${g.channels.length} ch</span>
+              </div>
+              ${isOpen && html`
+                <div>
+                  ${g.channels.map(ch => html`
+                    <${ChannelRow} key=${ch.channel} channel=${ch} />
+                  `)}
+                </div>
+              `}
+            </div>
+          `;
+      })}
+      </div>
+    </div>
+      `;
+    }
+
+    function ChannelRow({ channel }) {
+      const [showMembers, setShowMembers] = useState(false);
+      const isUser = channel.channel.startsWith('@');
+      const icon = isUser ? '@' : '#';
+      const color = isUser ? 'text-cyan-400' : 'text-violet-400';
+
+      return html`
+      <div class="border-b border-gray-800/30">
+        <div class="log-expand px-5 pl-10 py-2 flex items-center gap-2 hover:bg-gray-800/20"
+          onClick=${() => setShowMembers(!showMembers)}>
+          <span class="text-xs w-3 ${color} font-mono">${icon}</span>
+          <span class="text-xs font-mono ${color} flex-1">${channel.channel}</span>
+          <span class="text-xs text-gray-600">${channel.count}</span>
+        </div>
+        ${showMembers && html`
+          <div class="pl-16 pr-5 pb-2 space-y-0.5">
+            ${channel.members.map((pid, i) => html`
+              <div key=${i} class="text-xs font-mono text-gray-500 py-0.5 flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                ${pid}
+              </div>
+            `)}
+          </div>
+        `}
+      </div>
+      `;
+    }
+
+    /* ─── Console Page ─── */
+    function ConsolePage({ initialInput, onConsumeInput }) {
+      const [history, setHistory] = useState([]);
+      const [input, setInput] = useState('');
+      const [cmdHistory, setCmdHistory] = useState([]);
+      const [histIdx, setHistIdx] = useState(-1);
+      const [loading, setLoading] = useState(false);
+      const outRef = useRef(null);
+      const inputRef = useRef(null);
+
+      useEffect(() => {
+        if (initialInput) {
+          setInput(initialInput);
+          if (onConsumeInput) onConsumeInput();
+          setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 50);
+        }
+      }, [initialInput]);
+
+      async function exec() {
+        if (!input.trim()) return;
+        setLoading(true);
+        const cmd = input;
+        setCmdHistory(prev => [cmd, ...prev]);
+        setHistIdx(-1);
+        setHistory(prev => [...prev, { type: 'input', text: cmd }]);
+        setInput('');
+        const r = await api('/api/eval', { body: { code: cmd } });
+        setHistory(prev => [...prev, { type: r.ok ? 'output' : 'error', text: r.ok ? r.result : r.error }]);
+        setLoading(false);
+        setTimeout(() => { if (outRef.current) outRef.current.scrollTop = outRef.current.scrollHeight; }, 50);
+      }
+
+      function onKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); exec(); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); const n = Math.min(histIdx + 1, cmdHistory.length - 1); setHistIdx(n); setInput(cmdHistory[n] || ''); }
+        if (e.key === 'ArrowDown') { e.preventDefault(); const n = Math.max(histIdx - 1, -1); setHistIdx(n); setInput(n === -1 ? '' : cmdHistory[n] || ''); }
+      }
+
+      return html`
+      <div class="flex flex-col h-full">
+      <${SectionHeader} title="IEx Console" />
+      <div ref=${outRef}
+        class="flex-1 bg-gray-950 text-gray-300 text-xs overflow-y-auto p-4 font-mono whitespace-pre-wrap">
+        <div class="text-gray-600 mb-2">Interactive Elixir \u2014 evaluate code in the running application</div>
+        ${history.map(h => html`
+          <div style="color:${h.type === 'input' ? '#a78bfa' : h.type === 'error' ? '#f87171' : '#4ade80'}" class="py-px leading-relaxed">
+            ${h.type === 'input' ? html`<span class="text-gray-600">iex> </span>` : ''}${h.text}
+          </div>
+        `)}
+        ${loading && html`<div class="py-1"><span class="spinner"></span></div>`}
+      </div>
+      <div class="flex gap-2 items-center px-3 py-2 border-t border-gray-800">
+        <span class="text-violet-400 font-mono text-xs">iex></span>
+        <input ref=${inputRef} class="flex-1 px-2 py-1.5 bg-gray-950 border border-gray-800 text-xs text-gray-200 font-mono"
+          value=${input} onInput=${e => setInput(e.target.value)} onKeyDown=${onKey}
+          placeholder="Enum.map(1..5, & &1 * 2)" autocomplete="off" />
+        <button class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded cursor-pointer border-none"
+          onClick=${exec} disabled=${loading}>Run</button>
+      </div>
+    </div>
+      `;
+    }
+
+    /* ─── Files Page (browser only) ─── */
+    function FilesPage({ onOpenFile }) {
+      const [cwd, setCwd] = useState('.');
+      const [items, setItems] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      const load = useCallback(async (path) => {
+        setLoading(true);
+        const d = await api('/api/files?path=' + encodeURIComponent(path));
+        setItems(d.items || []);
+        setCwd(d.path || path);
+        setLoading(false);
+      }, []);
+
+      useEffect(() => { load('.'); }, []);
+
+      async function openFile(path) {
+        const d = await api('/api/file?path=' + encodeURIComponent(path));
+        if (d.content != null) {
+          onOpenFile({ path: d.path, content: d.content });
+        }
+      }
+
+      function goUp() {
+        if (cwd === '.' || cwd === '') return;
+        const parent = cwd.split('/').slice(0, -1).join('/') || '.';
+        load(parent);
+      }
+
+      return html`
+      <div class="h-full flex flex-col">
+      <div class="px-5 py-3 border-b border-gray-800 flex items-center gap-3 bg-gray-900/50">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Files</span>
+        <code class="text-xs text-gray-500 flex-1">${cwd === '.' ? '/' : '/' + cwd}</code>
+        ${cwd !== '.' && html`
+          <button class="text-xs text-gray-500 hover:text-gray-300 bg-transparent border-none cursor-pointer" onClick=${goUp}>\u2191 Up</button>
+        `}
+      </div>
+      <div class="flex-1 overflow-y-auto">
+      ${loading ? html`<div class="p-4"><span class="spinner"></span></div>` : html`
+        <div>
+          ${items.map(i => html`
+            <div class="flex items-center gap-2.5 px-5 py-1.5 hover:bg-gray-800/40 cursor-pointer transition-colors border-b border-gray-800/30"
+              onClick=${() => i.type === 'dir' ? load(i.path) : openFile(i.path)}>
+              <span class="w-4 text-center text-xs">${i.type === 'dir' ? '\uD83D\uDCC1' : '\uD83D\uDCC4'}</span>
+              <span class="text-sm flex-1 ${i.type === 'dir' ? 'text-violet-400' : 'text-gray-300'}">${i.name}</span>
+              ${i.size != null && html`<span class="text-xs text-gray-600">${formatSize(i.size)}</span>`}
+            </div>
+          `)}
+          ${items.length === 0 && html`<div class="p-4 text-gray-600 text-sm">Empty directory</div>`}
+        </div>
+      `}
+      </div>
+    </div>
+      `;
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    /* ─── Config Page ─── */
+    /* ─── Right Panel: Action Call Logs ─── */
+    function ActionLogsPanel({ onReplay }) {
+      const [logs, setLogs] = useState([]);
+      const [expanded, setExpanded] = useState({});
+      const [autoRefresh, setAutoRefresh] = useState(true);
+      const [filter, setFilter] = useState('');
+      const intervalRef = useRef(null);
+
+      const fetchLogs = useCallback(async () => {
+        try {
+          const d = await api('/api/logs?tag=action');
+          setLogs(d.logs || []);
+        } catch (e) { }
+      }, []);
+
+      useEffect(() => { fetchLogs(); }, []);
+
+      useEffect(() => {
+        if (autoRefresh) {
+          intervalRef.current = setInterval(fetchLogs, 2000);
+        }
+        return () => clearInterval(intervalRef.current);
+      }, [autoRefresh, fetchLogs]);
+
+      function toggleExpand(id) {
+        setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+      }
+
+      async function clearLogs() {
+        await api('/api/mcp', { body: { tool: 'clear_logs' } });
+        setLogs([]);
+      }
+
+      const filtered = useMemo(() => {
+        if (!filter.trim()) return logs;
+        const q = filter.toLowerCase();
+        return logs.filter(l => {
+          const d = l.data || {};
+          return (d.action || '').toLowerCase().includes(q) || (d.source || '').includes(q);
+        });
+      }, [logs, filter]);
+
+      return html`
+      <div class="flex flex-col h-full">
+      <div class="px-3 py-2 border-b border-gray-800 flex items-center gap-2 shrink-0">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Action Logs</span>
+        <span class="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded-full">${filtered.length}</span>
+        <div class="flex-1" />
+        <button class="text-xs text-gray-600 hover:text-gray-400 bg-transparent border-none cursor-pointer"
+          onClick=${() => setAutoRefresh(!autoRefresh)}>
+          ${autoRefresh ? '\u23F8' : '\u25B6'}
+        </button>
+        <button class="text-xs text-gray-600 hover:text-gray-400 bg-transparent border-none cursor-pointer" onClick=${clearLogs}>Clear</button>
+      </div>
+      <div class="px-3 py-1.5 border-b border-gray-800 shrink-0">
+        <input class="w-full px-2 py-1 bg-gray-950 border border-gray-800 text-xs text-gray-300"
+          placeholder="Filter by action name..." value=${filter} onInput=${e => setFilter(e.target.value)} />
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        ${filtered.length === 0
+          ? html`<div class="p-4 text-xs text-gray-600">No action calls logged yet.</div>`
+          : filtered.map(l => {
+            const data = l.data || {};
+            const isExpanded = expanded[l.id];
+            const hasError = data.response && (data.response.error || data.response.errors);
+            return html`
+              <div key=${l.id} class="border-b border-gray-800/40 log-new">
+                <div class="log-expand px-3 py-2 flex items-center gap-2" onClick=${() => toggleExpand(l.id)}>
+                  <span class="text-xs text-gray-600 w-3">${isExpanded ? '\u25BE' : '\u25B8'}</span>
+                  <span class="text-xs font-mono text-violet-400 flex-1 truncate">${data.action || '?'}</span>
+                  <span class="text-xs px-1 ${data.source === 'ws' ? 'text-cyan-400' : 'text-gray-600'}">${data.source || ''}</span>
+                  ${hasError && html`<span class="text-xs text-red-400">\u2717</span>`}
+                  <span class="text-xs text-gray-600">${data.duration}ms</span>
+                </div>
+                ${isExpanded && html`
+                  <div class="px-3 pb-3 space-y-2">
+                    <div class="flex items-center gap-2 text-xs text-gray-600">
+                      <span>${data.ip || ''}</span>
+                      <span>${new Date(l.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                    ${data.params && Object.keys(data.params).length > 0 && html`
+                      <div>
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="text-xs text-gray-600">Params</span>
+                          <button class="text-xs text-gray-600 hover:text-gray-300 bg-transparent border-none cursor-pointer"
+                            onClick=${() => navigator.clipboard.writeText(JSON.stringify(data.params, null, 2))}>Copy JSON</button>
+                          <button class="text-xs text-gray-600 hover:text-gray-300 bg-transparent border-none cursor-pointer"
+                            onClick=${() => navigator.clipboard.writeText(jsonToElixir(data.params))}>Copy Map</button>
+                        </div>
+                        <pre class="text-xs text-gray-400 bg-gray-950 p-2 overflow-x-auto whitespace-pre-wrap">${JSON.stringify(data.params, null, 2)}</pre>
+                      </div>
+                    `}
+                    ${data.auth && html`
+                      <div>
+                        <div class="text-xs text-gray-600 mb-0.5">Auth</div>
+                        <pre class="text-xs text-gray-400 bg-gray-950 p-2 overflow-x-auto whitespace-pre-wrap">${JSON.stringify(data.auth, null, 2)}</pre>
+                      </div>
+                    `}
+                    ${data.response != null && html`
+                      <div>
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="text-xs text-gray-600">Response</span>
+                          <button class="text-xs text-gray-600 hover:text-gray-300 bg-transparent border-none cursor-pointer"
+                            onClick=${() => navigator.clipboard.writeText(typeof data.response === 'string' ? data.response : JSON.stringify(data.response, null, 2))}>Copy JSON</button>
+                          <button class="text-xs text-gray-600 hover:text-gray-300 bg-transparent border-none cursor-pointer"
+                            onClick=${() => navigator.clipboard.writeText(jsonToElixir(data.response))}>Copy Map</button>
+                        </div>
+                        <pre class="text-xs ${hasError ? 'text-red-400' : 'text-gray-400'} bg-gray-950 p-2 overflow-x-auto whitespace-pre-wrap">${typeof data.response === 'string' ? data.response : JSON.stringify(data.response, null, 2)}</pre>
+                      </div>
+                    `}
+                    <div class="flex gap-2 pt-1">
+                      <button class="px-3 py-1.5 text-xs rounded border-none cursor-pointer transition-colors bg-violet-600 hover:bg-violet-700 text-white"
+                        onClick=${(e) => { e.stopPropagation(); onReplay(data); }}>Load in Runner</button>
+                    </div>
+                  </div>
+                `}
+              </div>
+            `;
+          })
+        }
+      </div>
+    </div>
+      `;
+    }
+
+    /* ─── Right Panel: File Editor ─── */
+
+    /* ─── Guides Page (Livebook-style) ─── */
+    function GuidesPage() {
+      const [guides, setGuides] = useState([]);
+      const [selected, setSelected] = useState(null);
+      const [selectedFile, setSelectedFile] = useState(null);
+      const [content, setContent] = useState('');
+      const [originalContent, setOriginalContent] = useState('');
+      const [loading, setLoading] = useState(true);
+      const [saving, setSaving] = useState(false);
+      const [dirty, setDirty] = useState(false);
+      const editorRef = useRef(null);
+      const cmRef = useRef(null);
+      const saveRef = useRef(null);
+
+      useEffect(() => {
+        api('/api/guides').then(d => {
+          setGuides(d.guides || []);
+          setLoading(false);
+        });
+      }, []);
+
+      async function loadGuide(g) {
+        setSelected(g.name);
+        setSelectedFile(g.file);
+        setContent('');
+        setDirty(false);
+        if (cmRef.current) { cmRef.current.toTextArea(); cmRef.current = null; }
+        const d = await api('/api/guide?name=' + encodeURIComponent(g.file));
+        const c = d.content || '';
+        setContent(c);
+        setOriginalContent(c);
+      }
+
+      // Mount CodeMirror for the edit pane
+      useEffect(() => {
+        if (!selected || !editorRef.current || cmRef.current) return;
+        if (!content && !originalContent) return; // wait for content to load
+        const cm = CodeMirror(editorRef.current, {
+          value: content,
+          mode: 'markdown',
+          theme: 'material-darker',
+          lineNumbers: true,
+          tabSize: 2,
+          indentUnit: 2,
+          indentWithTabs: false,
+          lineWrapping: true,
+          extraKeys: {
+            'Ctrl-S': () => { if (saveRef.current) saveRef.current(); },
+            'Cmd-S': () => { if (saveRef.current) saveRef.current(); },
+            Tab: (cm) => cm.replaceSelection('  ', 'end'),
+          }
+        });
+        cm.on('change', () => {
+          const val = cm.getValue();
+          setContent(val);
+          setDirty(val !== originalContent);
+        });
+        cmRef.current = cm;
+        setTimeout(() => cm.refresh(), 1);
+      }, [selected, originalContent]);
+
+      async function saveGuide() {
+        if (!selectedFile) return;
+        const val = cmRef.current ? cmRef.current.getValue() : content;
+        setSaving(true);
+        await api('/api/file', { method: 'PUT', body: { path: 'guides/' + selectedFile, content: val } });
+        setOriginalContent(val);
+        setContent(val);
+        setDirty(false);
+        setSaving(false);
+      }
+      saveRef.current = saveGuide;
+
+      function goBack() {
+        setSelected(null);
+        setSelectedFile(null);
+        setContent('');
+        setOriginalContent('');
+        setDirty(false);
+        if (cmRef.current) { cmRef.current.toTextArea(); cmRef.current = null; }
+      }
+
+      if (loading) return html`<div class="p-8"> <span class="spinner"></span></div> `;
+
+      if (!selected) {
+        return html`
+      <div class="h-full flex flex-col">
+          <${SectionHeader} title="Guides" count=${guides.length} />
+          <div class="flex-1 overflow-y-auto">
+            ${guides.length === 0
+            ? html`<div class="p-5 text-sm text-gray-600">No guides found. Add <code>.md</code> files to your project's <code>guides/</code> directory.</div>`
+            : guides.map(g => html`
+                <div class="flex items-center gap-3 px-5 py-3 hover:bg-gray-800/40 cursor-pointer transition-colors border-b border-gray-800/30"
+                  onClick=${() => loadGuide(g)}>
+                  <span class="text-lg">\uD83D\uDCD6</span>
+                  <div>
+                    <div class="text-sm text-gray-200">${g.name}</div>
+                    <div class="text-xs text-gray-600">${g.file}</div>
+                  </div>
+                </div>
+              `)
+          }
+          </div>
+        </div>
+      `;
+      }
+
+      return html`
+      <div class="h-full flex flex-col">
+        <div class="px-4 py-2 border-b border-gray-800 flex items-center gap-2 bg-gray-900/50 shrink-0">
+          <button class="text-gray-500 hover:text-gray-300 bg-transparent border-none cursor-pointer text-sm"
+            onClick=${goBack}>\u2190</button>
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex-1 truncate">${selected}</span>
+          ${dirty && html`<span class="text-xs text-amber-400">\u25CF</span>`}
+          <button class="px-2.5 py-1 text-xs rounded border-none cursor-pointer transition-colors
+            ${dirty ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-gray-800 text-gray-600 cursor-default'}"
+            onClick=${saveGuide} disabled=${!dirty || saving}>
+            ${saving ? html`<span class="spinner mr-1" style="width:10px;height:10px;border-width:1.5px"></span>` : ''} Save
+          </button>
+        </div>
+        <div class="flex flex-1 min-h-0">
+          <!-- Edit pane -->
+          <div class="cm-wrap flex-1 min-w-0 border-r border-gray-800" ref=${editorRef}></div>
+          <!-- Run pane -->
+          <div class="flex-1 min-w-0 overflow-y-auto">
+            ${content ? html`<${MarkdownRenderer} content=${content} />` : html`<div class="p-5"><span class="spinner"></span></div>`}
+          </div>
+        </div>
+      </div>
+      `;
+    }
+
+    /* ─── Markdown Renderer with evaluable code blocks ─── */
+    function MarkdownRenderer({ content }) {
+      const blocks = useMemo(() => parseMarkdown(content), [content]);
+      return html`<div class="guide-content px-6 py-5 space-y-4"> ${blocks.map((b, i) => html`<${MarkdownBlock} key=${i} block=${b} />`)}</div> `;
+    }
+
+    function parseMarkdown(md) {
+      const blocks = [];
+      const lines = md.split('\n');
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const codeMatch = line.match(/^\x60\x60\x60(\w*)/);
+        if (codeMatch) {
+          const lang = codeMatch[1] || '';
+          const codeLines = [];
+          i++;
+          while (i < lines.length && !lines[i].match(/^\x60\x60\x60\s*$/)) {
+            codeLines.push(lines[i]);
+            i++;
+          }
+          i++; // skip closing ```
+          blocks.push({ type: 'code', lang, code: codeLines.join('\n') });
+        } else if (line.trim() === '') {
+          i++;
+        } else {
+          // Collect consecutive text lines
+          const textLines = [];
+          while (i < lines.length && !lines[i].match(/^\x60\x60\x60/) && lines[i].trim() !== '') {
+            textLines.push(lines[i]);
+            i++;
+          }
+          const text = textLines.join('\n');
+          // Detect heading
+          const hMatch = text.match(/^(#{1,6})\s+(.*)/);
+          if (hMatch) {
+            blocks.push({ type: 'heading', level: hMatch[1].length, text: hMatch[2] });
+          } else {
+            blocks.push({ type: 'text', text });
+          }
+        }
+      }
+      return blocks;
+    }
+
+    function MarkdownBlock({ block }) {
+      if (block.type === 'heading') {
+        const sizes = { 1: 'text-xl', 2: 'text-lg', 3: 'text-base', 4: 'text-sm', 5: 'text-xs', 6: 'text-xs' };
+        const mt = block.level <= 2 ? 'mt-6' : 'mt-3';
+        return html`<div class="${sizes[block.level] || 'text-sm'} font-semibold text-gray-200 ${mt}">${renderInline(block.text)}</div>`;
+      }
+      if (block.type === 'code') {
+        return html`<${EvalCodeBlock} lang=${block.lang} code=${block.code} />`;
+      }
+      // text
+      return html`<p class="text-sm text-gray-400 leading-relaxed">${renderInline(block.text)}</p>`;
+    }
+
+    function renderInline(text) {
+      // Split on inline code `...`
+      const parts = text.split(/(\x60[^\x60]+\x60)/g);
+      return parts.map((p, i) => {
+        if (p.startsWith('\x60') && p.endsWith('\x60')) {
+          return html`<code key=${i} class="px-1 py-0.5 bg-gray-800 text-violet-400 text-xs rounded">${p.slice(1, -1)}</code>`;
+        }
+        // Bold
+        const boldParts = p.split(/(\*\*[^*]+\*\*)/g);
+        return boldParts.map((bp, j) => {
+          if (bp.startsWith('**') && bp.endsWith('**')) {
+            return html`<strong key=${j} class="text-gray-200">${bp.slice(2, -2)}</strong>`;
+          }
+          return bp;
+        });
+      });
+    }
+
+    function EvalCodeBlock({ lang, code }) {
+      const [result, setResult] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [editedCode, setEditedCode] = useState(code);
+      const editorRef = useRef(null);
+      const cmRef = useRef(null);
+      const editedRef = useRef(editedCode);
+      editedRef.current = editedCode;
+
+      const isEval = ['elixir', 'ex', 'exs', 'iex'].includes(lang) || lang === '';
+
+      const modeMap = {
+        elixir: 'ruby', ex: 'ruby', exs: 'ruby', iex: 'ruby', erl: 'erlang',
+        js: 'javascript', javascript: 'javascript', json: { name: 'javascript', json: true },
+        html: 'htmlmixed', css: 'css', md: 'markdown', shell: 'shell', bash: 'shell',
+        yaml: 'yaml', xml: 'xml'
+      };
+
+      useEffect(() => {
+        if (!editorRef.current || cmRef.current) return;
+        const lineCount = code.split('\n').length;
+        const cm = CodeMirror(editorRef.current, {
+          value: code,
+          mode: modeMap[lang] || null,
+          theme: 'material-darker',
+          lineNumbers: true,
+          tabSize: 2,
+          indentUnit: 2,
+          indentWithTabs: false,
+          lineWrapping: false,
+          viewportMargin: Infinity,
+          scrollbarStyle: 'null',
+        });
+        cm.setSize(null, null); // auto height
+        cm.on('change', () => {
+          const val = cm.getValue();
+          editedRef.current = val;
+          setEditedCode(val);
+        });
+        cmRef.current = cm;
+        setTimeout(() => cm.refresh(), 1);
+      }, []);
+
+      async function evalBlock() {
+        setLoading(true);
+        const r = await api('/api/eval', { body: { code: editedRef.current } });
+        setResult(r);
+        setLoading(false);
+      }
+
+      return html`
+      <div class="border border-gray-800 overflow-hidden group/eval relative">
+        <div class="cm-wrap-block" ref=${editorRef}></div>
+        ${isEval && html`
+          <button class="eval-run-btn absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded
+            border-none cursor-pointer transition-all opacity-0 group-hover/eval:opacity-100
+            ${loading ? 'bg-gray-700 text-gray-400' : 'bg-gray-800/80 hover:bg-violet-600 text-gray-400 hover:text-white'}"
+            onClick=${evalBlock} disabled=${loading} title="Evaluate">
+            ${loading ? html`<span class="spinner" style="width:8px;height:8px;border-width:1.5px"></span>` : html`<span style="font-size:10px">▶</span>`}
+          </button>
+        `}
+        ${result && html`
+          <div class="px-3 py-2 bg-gray-950 border-t border-gray-800 flex items-start gap-2">
+            <span class="text-xs mt-px ${result.ok ? 'text-emerald-400' : 'text-red-400'}">${result.ok ? '\u2713' : '\u2717'}</span>
+            <pre class="text-xs font-mono whitespace-pre-wrap flex-1 ${result.ok ? 'text-emerald-400' : 'text-red-400'}">${result.ok ? result.result : result.error}</pre>
+          </div>
+        `}
+      </div>
+    `;
+    }
+
+    /* ─── Right Panel: File Editor ─── */
+    function EditorPanel({ file, edited, dirty, saving, evalResult, onEdit, onSave, onClose, onEval }) {
+      const editorRef = useRef(null);
+      const cmRef = useRef(null);
+      const onEditRef = useRef(onEdit);
+      const onSaveRef = useRef(onSave);
+      onEditRef.current = onEdit;
+      onSaveRef.current = onSave;
+
+      const ext = file.path.split('.').pop();
+      const isElixir = ['ex', 'exs'].includes(ext);
+      const langLabel = {
+        ex: 'Elixir', exs: 'Elixir', erl: 'Erlang', js: 'JavaScript', ts: 'TypeScript',
+        json: 'JSON', html: 'HTML', css: 'CSS', md: 'Markdown', txt: 'Text', yml: 'YAML', yaml: 'YAML',
+        toml: 'TOML', xml: 'XML', sh: 'Shell'
+      }[ext] || ext.toUpperCase();
+
+      const modeMap = {
+        ex: 'ruby', exs: 'ruby', erl: 'erlang',
+        js: 'javascript', ts: 'javascript', json: { name: 'javascript', json: true },
+        html: 'htmlmixed', css: 'css', md: 'markdown',
+        yml: 'yaml', yaml: 'yaml', xml: 'xml', sh: 'shell'
+      };
+
+      useEffect(() => {
+        if (!editorRef.current || cmRef.current) return;
+        const cm = CodeMirror(editorRef.current, {
+          value: edited || '',
+          mode: modeMap[ext] || null,
+          theme: 'material-darker',
+          lineNumbers: true,
+          tabSize: 2,
+          indentUnit: 2,
+          indentWithTabs: false,
+          lineWrapping: false,
+          matchBrackets: true,
+          extraKeys: {
+            'Ctrl-S': () => onSaveRef.current(),
+            'Cmd-S': () => onSaveRef.current(),
+            Tab: (cm) => cm.replaceSelection('  ', 'end'),
+          }
+        });
+        cm.on('change', () => onEditRef.current(cm.getValue()));
+        cmRef.current = cm;
+        setTimeout(() => cm.refresh(), 1);
+      }, []);
+
+      useEffect(() => {
+        if (cmRef.current && cmRef.current.getValue() !== edited) {
+          cmRef.current.setValue(edited || '');
+        }
+      }, [edited]);
+
+      return html`
+    <div class="flex flex-col h-full">
+      <div class="px-3 py-2 border-b border-gray-800 flex items-center gap-2 shrink-0">
+        <button class="text-gray-500 hover:text-gray-300 bg-transparent border-none cursor-pointer text-sm" onClick=${onClose}>\u2715</button>
+        <code class="text-xs text-violet-400 flex-1 truncate">${file.path}</code>
+        <span class="text-xs text-gray-600">${langLabel}</span>
+        ${dirty && html`<span class="text-xs text-amber-400">\u25CF</span>`}
+        ${isElixir && html`
+          <button class="px-2 py-1 text-xs rounded border-none cursor-pointer transition-colors bg-amber-600 hover:bg-amber-700 text-white"
+            onClick=${onEval}>Eval</button>
+        `}
+        <button class="px-2 py-1 text-xs rounded border-none cursor-pointer transition-colors
+          ${dirty ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-gray-800 text-gray-600 cursor-default'}"
+          onClick=${onSave} disabled=${!dirty || saving}>
+          ${saving ? html`<span class="spinner mr-1"></span>` : ''} Save
+        </button>
+      </div>
+      <div class="cm-wrap flex-1 min-h-0" ref=${editorRef}></div>
+      ${evalResult && html`
+        <div class="border-t border-gray-800 px-3 py-2 bg-gray-950 shrink-0 max-h-32 overflow-y-auto">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-semibold ${evalResult.ok ? 'text-emerald-400' : 'text-red-400'}">
+              ${evalResult.ok ? 'Result' : 'Error'}
+            </span>
+          </div>
+          <pre class="text-xs ${evalResult.ok ? 'text-gray-400' : 'text-red-400'} whitespace-pre-wrap">${evalResult.ok ? evalResult.result : evalResult.error}</pre>
+        </div>
+      `}
+    </div>
+  `;
+    }
+
+    render(html`<${App} />`, document.getElementById('app'));
+    const pl = document.getElementById('preloader');
+    if (pl) {
+      pl.classList.add('fade-out');
+      setTimeout(() => pl.remove(), 300);
+    }
+  </script>
+</body>
+
+</html>

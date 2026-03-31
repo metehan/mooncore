@@ -82,13 +82,25 @@ defmodule Mooncore.Action do
 
     log_entry = if should_log, do: lifecycle_start(action, request), else: nil
 
-    request
-    |> run_hooks(:before_action)
-    |> tap(fn req -> if log_entry, do: lifecycle_phase(log_entry, :after_hooks, req) end)
-    |> then(fn req -> dispatch_to_app(action, req) end)
-    |> tap(fn resp -> if log_entry, do: lifecycle_phase(log_entry, :action_result, resp) end)
-    |> run_hooks(:after_action)
-    |> tap(fn resp -> if log_entry, do: lifecycle_end(log_entry, resp) end)
+    start = System.monotonic_time(:millisecond)
+
+    result =
+      request
+      |> run_hooks(:before_action)
+      |> tap(fn req -> if log_entry, do: lifecycle_phase(log_entry, :after_hooks, req) end)
+      |> then(fn req -> dispatch_to_app(action, req) end)
+      |> tap(fn resp -> if log_entry, do: lifecycle_phase(log_entry, :action_result, resp) end)
+      |> run_hooks(:after_action)
+      |> tap(fn resp -> if log_entry, do: lifecycle_end(log_entry, resp) end)
+
+    Mooncore.Dev.RequestLogger.log_action(
+      action,
+      request,
+      result,
+      System.monotonic_time(:millisecond) - start
+    )
+
+    result
   end
 
   defp lifecycle_start(action, request) do
@@ -273,6 +285,8 @@ defmodule Mooncore.Action do
     Mooncore.config(hook_type, [])
     |> Enum.reduce(data, fn mod, acc -> mod.call(acc) end)
   end
+
+  defp deep_merge_request(request, nil), do: request
 
   defp deep_merge_request(request, req_mod) when req_mod == %{}, do: request
 

@@ -57,7 +57,7 @@ defmodule Mooncore.MCP.Protocol do
        },
        serverInfo: %{
          name: "mooncore",
-         version: Mooncore.MixProject.project()[:version] || "0.1.0"
+         version: Application.spec(:mooncore, :vsn) |> to_string()
        }
      }}
   end
