@@ -4,13 +4,26 @@
 
 # Mooncore
 
-A lightweight, action-based api framework for Elixir.
+A lightweight, action-based API framework for Elixir.
 
-## Why Actions, Not REST
+## What is Mooncore
 
-REST was designed for documents — CRUD operations on URL-addressable resources. It works, but it forces you to think in terms of HTTP: which verb, which URL path, which status code, how to nest resources, how to handle batch operations that don't fit the resource model.
+Mooncore is a minimal Elixir framework for building APIs. It gives you everything you need — HTTP, WebSocket, authentication, middleware, and an MCP server for AI agents — with zero boilerplate and no heavyweight dependencies.
 
-Mooncore replaces all of that with a single concept: **actions**. Every feature is a named function call.
+- **Minimal and focused.** No ORM, no templating, no asset pipeline. Just the tools you need for APIs.
+- **Multi-transport out of the box.** HTTP and WebSocket work from day one with the same application logic.
+- **Built-in auth.** JWT authentication (RS256) with role-based access control, ready to use.
+- **AI-ready.** Ships with an MCP server so AI agents can discover, call, and test your API directly.
+- **Functional and predictable.** Every operation is a function: parameters in, result out. No hidden state, no magic.
+
+Mooncore runs on [Bandit](https://github.com/mtrudel/bandit) and [Plug](https://github.com/elixir-plug/plug), so you get the performance and reliability of the BEAM with a surface area small enough to read in an afternoon.
+
+### Actions
+
+At its core, Mooncore uses a single concept to model your entire API: **actions**. Every feature is a named function call — not an HTTP endpoint.
+
+#### Why not REST?
+REST was designed for documents — CRUD operations on URL-addressable resources. It works, but it forces you to think in terms of HTTP: which verb, which URL path, which status code, how to nest resources, how to handle batch operations that don't fit the resource model. Actions let you skip all of that:
 
 ```
 REST                              Mooncore
@@ -46,7 +59,7 @@ Action.run/2 ◄─┼─── Elixir function call
                └─── Cron scheduler
 ```
 
-With REST, adding WebSocket support means rebuilding your entire API layer. With actions, you write the logic once and plug in transports. Need a NATS consumer that triggers `"order.process"`? It's one adapter that calls `Action.execute/2` — your handler doesn't change.
+Write the logic once, plug in transports. Need a NATS consumer that triggers `"order.process"`? It's one adapter that calls `Action.execute/2` — your handler doesn't change.
 
 ### AI-Native Development
 
