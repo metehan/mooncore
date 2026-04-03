@@ -22,11 +22,10 @@ Mooncore runs on [Bandit](https://github.com/mtrudel/bandit) and [Plug](https://
 
 At its core, Mooncore uses a single concept to model your entire API: **actions**. Every feature is a named function call — not an HTTP endpoint.
 
-#### Why not REST?
-REST was designed for documents — CRUD operations on URL-addressable resources. It works, but it forces you to think in terms of HTTP: which verb, which URL path, which status code, how to nest resources, how to handle batch operations that don't fit the resource model. Actions let you skip all of that:
+REST still works in Mooncore, but it stays a routing choice in your `Plug.Router`, not the center of the framework. Actions let you define the business operation once and expose it over HTTP, WebSocket, MCP, or direct Elixir calls:
 
 ```
-REST                              Mooncore
+REST                              Mooncore Action
 ────                              ────────
 GET    /api/tasks                 "task.list"
 POST   /api/tasks                 "task.create"
@@ -37,7 +36,21 @@ POST   /api/tasks/batch-archive   "task.batch_archive"
 GET    /api/reports/weekly?...     "report.weekly"
 ```
 
-No routing tables, no path params, no verb selection, no "is this a PUT or PATCH" debates. Just action names and parameters.
+No duplicate business logic, no route-specific handlers, no "which transport owns this logic" debates. Just action names and parameters.
+
+### REST and Routes
+
+If you want a REST API, build it in your router and call into actions from each route. Mooncore provides the action pipeline and the HTTP adapter; you decide whether the public surface is action-shaped or REST-shaped.
+
+```elixir
+get "/api/tasks" do
+  Mooncore.Action.execute("task.list", %{auth: conn.assigns[:auth], params: %{}})
+end
+
+post "/api/tasks" do
+  Mooncore.Action.execute("task.create", %{auth: conn.assigns[:auth], params: conn.body_params})
+end
+```
 
 ### Transport Independence
 

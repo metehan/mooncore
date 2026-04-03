@@ -18,6 +18,8 @@ When creating a new Mooncore application, generate this structure:
 my_app/
 ├── config/
 │   └── config.exs
+├── guides/
+│   └── actions.md         # companion guide for the action set
 ├── lib/
 │   ├── my_app.ex              # Application module
 │   └── my_app/
@@ -185,6 +187,22 @@ defmodule MyApp.Router do
   end
 end
 ```
+
+### guides/actions.md
+
+Create a companion guide for every new action or action module.
+
+Keep the guide in `guides/` so the Dev Tools Guides screen can list it, open it, and run any Elixir code blocks inline.
+
+Each guide should explain:
+
+- what the action or action group does
+- how to call it with `Mooncore.Action.execute/2`
+- `curl` and WebSocket examples when relevant
+- the expected inputs, roles, and middleware
+- a short test or verification flow so the developer can see it working
+
+Split guides by domain so each action group has its own file, such as `guides/users.md` or `guides/billing.md`.
 
 ## How Actions Work
 
