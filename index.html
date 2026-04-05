@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mooncore — Lightweight Action-Based API Framework</title>
+    <!-- UnoCSS runtime from CDN (module) -->
+    <script type="module">
+      import 'https://cdn.jsdelivr.net/npm/@unocss/runtime/dist/unocss.mjs'
+    </script>
+    <style>
+      /* Fallback minimal styling if UnoCSS runtime isn't available */
+      :root{--max-w:980px}
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:0;padding:2rem;background:#f9fafb;color:#0f172a}
+      .container{max-width:var(--max-w);margin:0 auto;padding:2rem;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+      h1{font-size:1.75rem;margin:0 0 0.5rem}
+      h2{font-size:1.125rem;margin-top:1.25rem}
+      p{line-height:1.6;margin:0.5rem 0}
+      ul{margin:0.5rem 0 0 1.25rem}
+      table{width:100%;border-collapse:collapse;margin-top:0.5rem}
+      th,td{border:1px solid #e6eef6;padding:0.5rem;text-align:left}
+      footer{font-size:0.85rem;color:#475569;margin-top:1.25rem}
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>Mooncore</h1>
+        <p>Lightweight, action-based API framework for Elixir — a Phoenix alternative that puts actions at the center of everything.</p>
+      </header>
+
+      <section>
+        <h2>Introduction</h2>
+        <p>Mooncore is a lightweight, action-based API framework for Elixir — a Phoenix alternative that puts actions at the center of everything.</p>
+      </section>
+
+      <section>
+        <h2>Why Mooncore?</h2>
+        <p>Phoenix is powerful but often brings a heavy ecosystem. Mooncore takes a different path: it centers your app around named actions instead of controllers and heavy frameworks.</p>
+      </section>
+
+      <section>
+        <h2>Core Ideas</h2>
+        <ul>
+          <li><strong>Actions, not controllers:</strong> Named actions (e.g., "task.create", "user.login") map to handler functions — no controllers or per-endpoint routes required.</li>
+          <li><strong>Transport-agnostic:</strong> Actions are callable from HTTP, WebSocket, or direct Elixir calls without code changes.</li>
+          <li><strong>You own the router:</strong> Mooncore provides building blocks; you decide your Plug.Router and response shapes.</li>
+          <li><strong>No database opinions:</strong> Pick your database client and wire it through middleware; Mooncore makes no assumptions.</li>
+          <li><strong>Minimal magic:</strong> No code generation or hidden macros — explicit, visible control flow.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>What It Includes</h2>
+        <table>
+          <thead>
+            <tr><th>Component</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Mooncore.Action</td><td>Action dispatcher with role checking and middleware pipeline</td></tr>
+            <tr><td>Mooncore.Auth</td><td>JWT RS256 authentication (token creation, verification, plug)</td></tr>
+            <tr><td>Mooncore.Endpoint.Http</td><td>HTTP adapter — turns a Plug.Conn into an action call</td></tr>
+            <tr><td>Mooncore.Endpoint.Socket</td><td>WebSocket adapter — pub/sub broadcasting and message routing</td></tr>
+            <tr><td>Mooncore.Middleware</td><td>Before/after hooks for request/response transformation</td></tr>
+            <tr><td>Mooncore.App</td><td>Multi-app registry — support multiple apps in one deployment</td></tr>
+            <tr><td>Mooncore.Dev</td><td>Development dashboard and MCP server for AI observability</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>What It Doesn't Include</h2>
+        <ul>
+          <li>No HTML templating engine</li>
+          <li>No database layer or ORM</li>
+          <li>No asset pipeline</li>
+          <li>No code generators</li>
+          <li>No LiveView equivalent</li>
+        </ul>
+        <p>You bring tools for those needs; Mooncore focuses on action dispatch, auth, real-time comms, and middleware.</p>
+      </section>
+
+      <section>
+        <h2>Who Is It For?</h2>
+        <ul>
+          <li>Developers building API-first applications and real-time backends</li>
+          <li>Teams that want WebSocket support as a first-class feature</li>
+          <li>Projects favoring explicit code over convention-heavy frameworks</li>
+          <li>Multi-tenant or multi-app deployments</li>
+        </ul>
+      </section>
+
+      <footer>
+        <p>Learn more in the repository README or the docs in the <em>guides/</em> folder.</p>
+      </footer>
+    </main>
+  </body>
+</html>
