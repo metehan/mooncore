@@ -5,9 +5,9 @@ defmodule Mooncore.MCP.Watcher do
   Stores temporary logs in a ring buffer (configurable max size).
   AI agents or the dev UI can add watchers, read logs, and filter by tag.
 
-  Only active when devmode is enabled:
+  Only active when mooncore_dev_tools is enabled:
 
-      config :mooncore, devmode: true
+      config :mooncore, mooncore_dev_tools: true
 
   ## Usage
 
@@ -40,9 +40,9 @@ defmodule Mooncore.MCP.Watcher do
     {:ok, %{logs: [], watchers: [], max: @max_logs}}
   end
 
-  @doc "Log an event with a tag. Only stores if devmode is on."
+  @doc "Log an event with a tag. Only stores if mooncore_dev_tools is on."
   def log(tag, data) do
-    if Mooncore.config(:devmode, false) and Process.whereis(__MODULE__) do
+    if Mooncore.mooncore_dev_tools_enabled?() and Process.whereis(__MODULE__) do
       GenServer.cast(__MODULE__, {:log, tag, data})
     end
   end

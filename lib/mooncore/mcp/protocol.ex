@@ -3,7 +3,7 @@ defmodule Mooncore.MCP.Protocol do
   Standard MCP (Model Context Protocol) JSON-RPC 2.0 handler.
 
   Implements the Streamable HTTP transport for VS Code and other MCP clients.
-  All operations require devmode to be enabled.
+  All operations require mooncore_dev_tools to be enabled.
 
   ## Supported Methods
 

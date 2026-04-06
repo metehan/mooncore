@@ -6,7 +6,7 @@ defmodule Mooncore.Dev.RequestLogger do
   regardless of transport (HTTP, WebSocket, MCP runner).
 
   Logs are stored in `Mooncore.MCP.Watcher` with tag `:action`.
-  Only logs when `config :mooncore, devmode: true`.
+  Only logs when `config :mooncore, mooncore_dev_tools: true`.
   """
 
   @doc """
@@ -14,7 +14,7 @@ defmodule Mooncore.Dev.RequestLogger do
   Called automatically from Action.execute after every action.
   """
   def log_action(action, request, response, duration) do
-    if Mooncore.config(:devmode, false) do
+    if Mooncore.mooncore_dev_tools_enabled?() do
       params = Map.drop(request[:params] || %{}, ["action"])
       auth = request[:auth]
 

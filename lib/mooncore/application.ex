@@ -11,7 +11,7 @@ defmodule Mooncore.Application do
         port: 4000,                  # HTTP port (default: 4444)
         router: MyApp.Router,        # Your Plug.Router module
         pools: [:default, :myapp],   # WebSocket client pool names
-        devmode: true,               # Enable dev dashboard & MCP
+        mooncore_dev_tools: true,               # Enable dev dashboard & MCP
         mcp_port: 4040               # Dev/MCP port (default: 4040)
   """
 
@@ -29,7 +29,7 @@ defmodule Mooncore.Application do
     router = Mooncore.config(:router)
     port = Mooncore.config(:port, 4444)
     pools = Mooncore.config(:pools, [:default])
-    devmode = Mooncore.config(:devmode, false)
+    mooncore_dev_tools = Mooncore.mooncore_dev_tools_enabled?()
 
     server =
       if router do
@@ -46,7 +46,7 @@ defmodule Mooncore.Application do
       end)
 
     dev_children =
-      if devmode do
+      if mooncore_dev_tools do
         mcp_port = Mooncore.config(:mcp_port, 4040)
 
         [

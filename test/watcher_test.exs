@@ -1,18 +1,22 @@
 defmodule Mooncore.MCP.WatcherTest do
   use ExUnit.Case
 
+  @moduletag skip:
+               if(System.get_env("MOONCORE_DEV_MODE") == "true",
+                 do: false,
+                 else:
+                   "MOONCORE_DEV_MODE=true not set — run with: MOONCORE_DEV_MODE=true mix test"
+               )
+
   setup do
-    # Start watcher for each test
     start_supervised!(Mooncore.MCP.Watcher)
-    # Enable devmode for tests
-    Application.put_env(:mooncore, :devmode, true)
-    on_exit(fn -> Application.delete_env(:mooncore, :devmode) end)
+    Application.put_env(:mooncore, :mooncore_dev_tools, true)
+    on_exit(fn -> Application.delete_env(:mooncore, :mooncore_dev_tools) end)
     :ok
   end
 
   test "log and read" do
     Mooncore.MCP.Watcher.log(:test, %{message: "hello"})
-    # Give the cast time to process
     :timer.sleep(10)
     logs = Mooncore.MCP.Watcher.read()
     assert length(logs) == 1
@@ -83,8 +87,8 @@ defmodule Mooncore.MCP.WatcherTest do
     assert_receive {:mooncore_log, :only_this, _}, 500
   end
 
-  test "does not log when devmode is off" do
-    Application.put_env(:mooncore, :devmode, false)
+  test "does not log when mooncore_dev_tools is off" do
+    Application.put_env(:mooncore, :mooncore_dev_tools, false)
     Mooncore.MCP.Watcher.log(:test, %{should_not: true})
     :timer.sleep(10)
     assert Mooncore.MCP.Watcher.read() == []

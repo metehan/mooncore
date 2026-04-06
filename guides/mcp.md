@@ -2,15 +2,15 @@
 
 Mooncore includes a built-in [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that exposes your application's internals to AI tools, IDE extensions, and custom integrations. It implements the **Streamable HTTP** transport with JSON-RPC 2.0.
 
-> **Security:** The MCP server provides full access to action execution, code evaluation, and log inspection. Never enable devmode in production.
+> **Security:** The MCP server provides full access to action execution, code evaluation, and log inspection. Never enable mooncore_dev_tools in production.
 
 ## Setup
 
-Enable devmode in your config:
+Enable mooncore_dev_tools in your config:
 
 ```elixir
 config :mooncore,
-  devmode: true,
+  mooncore_dev_tools: true,
   mcp_port: 4040   # default
 ```
 
@@ -219,7 +219,7 @@ Current server configuration (sanitized).
   "pools": ["default"],
   "router": "MyApp.Router",
   "app_module": "MyApp.App",
-  "devmode": true,
+  "mooncore_dev_tools": true,
   "watcher_count": 0,
   "log_count": 15
 }
@@ -312,7 +312,7 @@ Mooncore.MCP.Watcher.log(:db, %{query: "FOR t IN tasks RETURN t", time_ms: 12})
 Mooncore.MCP.Watcher.log(:error, %{action: "task.create", reason: "validation failed"})
 ```
 
-The `:action` tag is used automatically by the action pipeline when devmode is enabled, logging every action execution with params, auth, response, duration, and source (http/ws).
+The `:action` tag is used automatically by the action pipeline when mooncore_dev_tools is enabled, logging every action execution with params, auth, response, duration, and source (http/ws).
 
 ### Reading Logs
 
@@ -373,4 +373,4 @@ Mooncore.MCP.Server.clear_logs()
 Mooncore.MCP.Server.add_watcher_session(:action)
 ```
 
-All functions require `config :mooncore, devmode: true` and will return errors or throw when devmode is off.
+All functions require `config :mooncore, mooncore_dev_tools: true` and will return errors or throw when mooncore_dev_tools is off.

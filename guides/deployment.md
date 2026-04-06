@@ -22,7 +22,7 @@ import Config
 
 config :mooncore,
   port: 4000,
-  devmode: true,
+  mooncore_dev_tools: true,
   jwt: [
     key: File.read!("priv/dev_key.pem"),
     issuer: "myapp-dev"
@@ -32,7 +32,7 @@ config :mooncore,
 import Config
 
 config :mooncore,
-  devmode: false  # always false in production
+  mooncore_dev_tools: false  # always false in production
 
 # config/runtime.exs — runtime secrets
 import Config
@@ -93,12 +93,17 @@ CMD ["bin/my_app", "start"]
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `PORT` | HTTP listening port |
-| `JWT_PRIVATE_KEY` | RSA private key PEM for JWT signing |
-| `JWT_ISSUER` | JWT issuer claim |
-| `SECRET_KEY_BASE` | For cookie signing if you use Plug sessions |
+| Variable              | Description                                                                 |
+| --------------------- | --------------------------------------------------------------------------- |
+| `PORT`                | HTTP listening port                                                         |
+| `JWT_PRIVATE_KEY`     | RSA private key PEM for JWT signing                                         |
+| `JWT_ISSUER`          | JWT issuer claim                                                            |
+| `SECRET_KEY_BASE`     | For cookie signing if you use Plug sessions                                 |
+| `MOONCORE_DEV_MODE`   | Must be `"true"` to enable dev tools (used with `mooncore_dev_tools: true`) |
+
+### Why Two Gates?
+
+Dev tools require both `config :mooncore, mooncore_dev_tools: true` AND `MOONCORE_DEV_MODE=true`. This prevents accidental exposure in production — even if a config file is misconfigured or copied from dev, the environment variable acts as a second safety gate. The config says "this environment is allowed to have dev tools" and the env var says "this specific deployment instance has dev tools turned on."
 
 ## Health Checks
 
@@ -129,7 +134,7 @@ end
 
 ## Production Checklist
 
-- [ ] `devmode: false` — never expose dev tools in production
+- [ ] `mooncore_dev_tools: false` — never expose dev tools in production
 - [ ] JWT private key loaded from environment variable, not committed to repo
 - [ ] CORS origins restricted to your domains (not `["*"]`)
 - [ ] Plug.Logger or custom logging configured

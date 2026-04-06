@@ -2,9 +2,9 @@ defmodule Mooncore.MCP.Server do
   @moduledoc """
   MCP (Model Context Protocol) server for AI observability.
 
-  **Everything is gated behind devmode.** Nothing is exposed when devmode is off.
+  **Everything is gated behind mooncore_dev_tools.** Nothing is exposed when mooncore_dev_tools is off.
 
-      config :mooncore, devmode: true
+      config :mooncore, mooncore_dev_tools: true
 
   ## Resources (read-only)
   - `actions` — list all registered actions across all apps
@@ -23,13 +23,13 @@ defmodule Mooncore.MCP.Server do
   alias Mooncore.Endpoint.Socket.Clients
   alias Mooncore.MCP.Watcher
 
-  defp devmode?, do: Mooncore.config(:devmode, false) == true
+  defp mooncore_dev_tools?, do: Mooncore.mooncore_dev_tools_enabled?()
 
   # ── Read-only resources ──
 
-  @doc "List all registered actions across all apps. Requires devmode."
+  @doc "List all registered actions across all apps. Requires mooncore_dev_tools."
   def list_actions do
-    if not devmode?(), do: throw(:devmode_required)
+    if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
     Mooncore.App.list()
     |> Enum.flat_map(fn {app_key, app_info} ->
@@ -52,9 +52,9 @@ defmodule Mooncore.MCP.Server do
     end)
   end
 
-  @doc "Get connected client counts for a pool. Requires devmode."
+  @doc "Get connected client counts for a pool. Requires mooncore_dev_tools."
   def list_clients(pool \\ :default) do
-    if not devmode?(), do: throw(:devmode_required)
+    if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
     Clients.list_all(pool)
     |> Enum.map(fn {group, channels} ->
@@ -71,9 +71,9 @@ defmodule Mooncore.MCP.Server do
     end)
   end
 
-  @doc "Get all registered apps (sanitized — no sensitive data). Requires devmode."
+  @doc "Get all registered apps (sanitized — no sensitive data). Requires mooncore_dev_tools."
   def list_apps do
-    if not devmode?(), do: throw(:devmode_required)
+    if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
     Mooncore.App.list()
     |> Enum.map(fn {key, info} ->
@@ -86,16 +86,16 @@ defmodule Mooncore.MCP.Server do
     end)
   end
 
-  @doc "Get current server configuration (sanitized). Requires devmode."
+  @doc "Get current server configuration (sanitized). Requires mooncore_dev_tools."
   def server_info do
-    if not devmode?(), do: throw(:devmode_required)
+    if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
     %{
       port: Mooncore.config(:port, 4444),
       pools: Mooncore.config(:pools, [:default]),
       router: inspect(Mooncore.config(:router)),
       app_module: inspect(Mooncore.config(:app_module)),
-      devmode: Mooncore.config(:devmode, false),
+      mooncore_dev_tools: Mooncore.config(:mooncore_dev_tools, false),
       before_action: inspect(Mooncore.config(:before_action, [])),
       after_action: inspect(Mooncore.config(:after_action, [])),
       watcher_count: Watcher.watcher_count(),
@@ -103,10 +103,10 @@ defmodule Mooncore.MCP.Server do
     }
   end
 
-  # ── Tools (devmode) ──
+  # ── Tools (mooncore_dev_tools) ──
 
   @doc """
-  Run an action through the full pipeline. Devmode only.
+  Run an action through the full pipeline. mooncore_dev_tools only.
 
   ## Params
   - `action` — action name string
@@ -114,8 +114,8 @@ defmodule Mooncore.MCP.Server do
   - `auth` — optional auth map (roles, user, app, dkey, scope)
   """
   def run_action(action, params \\ %{}, auth \\ nil) do
-    if not Mooncore.config(:devmode, false) do
-      %{error: "run_action requires devmode"}
+    if not Mooncore.mooncore_dev_tools_enabled?() do
+      %{error: "run_action requires mooncore_dev_tools"}
     else
       request = %{
         params: Map.put(params, "action", action),
@@ -132,19 +132,19 @@ defmodule Mooncore.MCP.Server do
     end
   end
 
-  @doc "Add a log watcher. Returns a reference for reading. Devmode only."
+  @doc "Add a log watcher. Returns a reference for reading. mooncore_dev_tools only."
   def add_watcher_session(tag_filter \\ nil) do
-    if not Mooncore.config(:devmode, false) do
-      %{error: "requires devmode"}
+    if not Mooncore.mooncore_dev_tools_enabled?() do
+      %{error: "requires mooncore_dev_tools"}
     else
       Watcher.add_watcher(self(), tag_filter)
       %{ok: true, message: "Watcher added for pid #{inspect(self())}"}
     end
   end
 
-  @doc "Read logs. Optional tag filter or since_id. Requires devmode."
+  @doc "Read logs. Optional tag filter or since_id. Requires mooncore_dev_tools."
   def read_logs(opts \\ %{}) do
-    if not devmode?(), do: throw(:devmode_required)
+    if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
     cond do
       opts["since_id"] -> Watcher.read_since(opts["since_id"])
@@ -153,20 +153,20 @@ defmodule Mooncore.MCP.Server do
     end
   end
 
-  @doc "Clear all collected logs. Requires devmode."
+  @doc "Clear all collected logs. Requires mooncore_dev_tools."
   def clear_logs do
-    if not devmode?(), do: throw(:devmode_required)
+    if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
     Watcher.clear()
     %{ok: true}
   end
 
   @doc """
-  Evaluate Elixir code in the running application. Devmode only.
+  Evaluate Elixir code in the running application. mooncore_dev_tools only.
   Returns the result or error.
   """
   def eval_code(code) when is_binary(code) do
-    if not Mooncore.config(:devmode, false) do
-      %{error: "eval requires devmode"}
+    if not Mooncore.mooncore_dev_tools_enabled?() do
+      %{error: "eval requires mooncore_dev_tools"}
     else
       try do
         {result, _bindings} = Code.eval_string(code)
@@ -183,11 +183,11 @@ defmodule Mooncore.MCP.Server do
   Handle an MCP-style request. Returns a map response.
 
   Read resources: actions, clients, apps, config
-  Tools (devmode): run_action, add_watcher, read_logs, clear_logs, eval
+  Tools (mooncore_dev_tools): run_action, add_watcher, read_logs, clear_logs, eval
   """
   def handle_request(params) do
-    if not devmode?() do
-      %{error: "MCP server requires devmode"}
+    if not mooncore_dev_tools?() do
+      %{error: "MCP server requires mooncore_dev_tools"}
     else
       do_handle_request(params)
     end
@@ -240,11 +240,7 @@ defmodule Mooncore.MCP.Server do
     }
   end
 
-  defp safe_to_atom(str) when is_binary(str) do
-    String.to_existing_atom(str)
-  rescue
-    _ -> String.to_atom(str)
-  end
+  defp safe_to_atom(str) when is_binary(str), do: String.to_existing_atom(str)
 
   defp safe_to_atom(atom) when is_atom(atom), do: atom
 end

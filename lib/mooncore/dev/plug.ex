@@ -8,19 +8,19 @@ defmodule Mooncore.Dev.Plug do
   - Standard MCP protocol endpoint (JSON-RPC 2.0 over Streamable HTTP)
   - JSON API endpoints for MCP operations
 
-  Only active when `config :mooncore, devmode: true`.
+  Only active when `config :mooncore, mooncore_dev_tools: true`.
   Automatically started on the configured `mcp_port` (default: 4040).
 
   ## Configuration
 
       config :mooncore,
-        devmode: true,
+        mooncore_dev_tools: true,
         mcp_port: 4040   # default
   """
 
   use Plug.Router
 
-  plug(:check_devmode)
+  plug(:check_mooncore_dev_tools)
 
   plug(Plug.Parsers,
     parsers: [{:json, json_decoder: Jason}],
@@ -30,8 +30,8 @@ defmodule Mooncore.Dev.Plug do
   plug(:match)
   plug(:dispatch)
 
-  defp check_devmode(conn, _opts) do
-    if Mooncore.config(:devmode, false) do
+  defp check_mooncore_dev_tools(conn, _opts) do
+    if Mooncore.mooncore_dev_tools_enabled?() do
       conn
     else
       conn

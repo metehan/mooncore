@@ -2,20 +2,39 @@
 
 Mooncore includes a built-in development dashboard for real-time observability of your running application. The dashboard is a full-featured single-page app with live VM metrics, action execution, developer tools, and more.
 
-> **Security:** Never enable devmode in production. The dashboard provides full access to eval, action execution, and file system browsing.
+> **Security:** Never enable mooncore_dev_tools in production. The dashboard provides full access to eval, action execution, and file system browsing.
 
 ## Enabling Dev Mode
+
+Dev tools require **two gates** to be open:
+
+1. **Config gate** — `mooncore_dev_tools: true` in your application config
+2. **Environment gate** — `MOONCORE_DEV_MODE=true` environment variable
+
+Both must be set. This two-gate system ensures dev tools can't accidentally be enabled in production through a misconfigured config file alone.
 
 ```elixir
 # config/dev.exs
 config :mooncore,
-  devmode: true,
+  mooncore_dev_tools: true,
   mcp_port: 4040   # default, can be changed
 ```
 
-When devmode is enabled, a dedicated HTTP server starts on `mcp_port` (default 4040). Open `http://localhost:4040/` in your browser.
+```bash
+# Set the environment variable before starting the app
+export MOONCORE_DEV_MODE=true
+mix run --no-halt
+```
 
-When devmode is off, nothing dev-related starts — no server, no watcher, no overhead.
+Or inline:
+
+```bash
+MOONCORE_DEV_MODE=true mix run --no-halt
+```
+
+When both gates are open, a dedicated HTTP server starts on `mcp_port` (default 4040). Open `http://localhost:4040/` in your browser.
+
+When either gate is closed, nothing dev-related starts — no server, no watcher, no overhead.
 
 ## Dashboard Screens
 
