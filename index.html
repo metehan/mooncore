@@ -310,110 +310,166 @@
     </div>
   </section>
 
-  <!-- Devtools Section -->
+  <!-- MCP Server / Devtools -->
   <section id="devtools" class="py-20 section-glass">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <h2 class="text-3xl md:text-4xl font-bold text-center mb-4">See Your App Live While You Build It</h2>
-      <p class="text-gray-200 text-center mb-16 max-w-2xl mx-auto">
-        Enable <span class="font-mono text-primary-400">devmode: true</span> and a dashboard opens at <span
-          class="font-mono text-primary-400">localhost:4040</span>. No setup, no extra dependencies.
+      <h2 class="text-3xl md:text-4xl font-bold text-center mb-4">MCP Server</h2>
+      <p class="text-gray-200 text-center mb-6 max-w-3xl mx-auto">
+        Mooncore includes a built-in <a href="https://modelcontextprotocol.io/" class="text-primary-400">Model Context
+          Protocol (MCP)</a> server
+        that exposes your application's internals to AI tools, IDE extensions, and custom integrations. It implements
+        the
+        <strong>Streamable HTTP</strong> transport with JSON-RPC 2.0.
       </p>
 
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-        <div class="glass-card p-6 rounded-xl hover:border-blue-500/50 transition-colors group">
-          <div
-            class="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
-            <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2 text-blue-400">Run Any Action</h3>
-          <p class="text-gray-200 text-sm">Type a name, pass parameters, see the result. No curl, no Postman.</p>
-        </div>
-
-        <div class="glass-card p-6 rounded-xl hover:border-purple-500/50 transition-colors group">
-          <div
-            class="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
-            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2 text-purple-400">Watch Live Executions</h3>
-          <p class="text-gray-200 text-sm">Every action call is logged with input, output, and timing.</p>
-        </div>
-
-        <div class="glass-card p-6 rounded-xl hover:border-green-500/50 transition-colors group">
-          <div
-            class="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-green-500/20 transition-colors">
-            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2 text-green-400">Browse File System</h3>
-          <p class="text-gray-200 text-sm">Open and read your project files from the browser.</p>
-        </div>
-
-        <div class="glass-card p-6 rounded-xl hover:border-amber-500/50 transition-colors group">
-          <div
-            class="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-amber-500/20 transition-colors">
-            <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2 text-amber-400">Read Your Guides</h3>
-          <p class="text-gray-200 text-sm">Mooncore picks up <span class="font-mono">.md</span> files in <span
-              class="font-mono">guides/</span> and displays them inline.</p>
-        </div>
-
-        <div class="glass-card p-6 rounded-xl hover:border-pink-500/50 transition-colors group">
-          <div
-            class="w-10 h-10 bg-pink-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-pink-500/20 transition-colors">
-            <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2 text-pink-400">Monitor the VM</h3>
-          <p class="text-gray-200 text-sm">Memory, process count, scheduler utilization.</p>
-        </div>
-
-        <div class="glass-card p-6 rounded-xl hover:border-cyan-500/50 transition-colors group">
-          <div
-            class="w-10 h-10 bg-cyan-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-cyan-500/20 transition-colors">
-            <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2 text-cyan-400">Connect AI Agents</h3>
-          <p class="text-gray-200 text-sm">MCP server at <span class="font-mono">localhost:4040/mcp</span> for AI tools.
-          </p>
-        </div>
+      <div class="bg-amber-600/10 border border-amber-600/20 rounded-lg p-6 mb-8 max-w-4xl mx-auto">
+        <strong class="text-amber-400">Security:</strong>
+        <span class="text-gray-200">The MCP server provides full access to action execution, code evaluation, and log
+          inspection. Never enable <span class="font-mono">mooncore_dev_tools</span> in production.</span>
       </div>
 
-      <div class="glass-card-strong p-8 rounded-xl">
-        <h3 class="text-lg font-semibold mb-4 text-gray-200">AI Agent Integration</h3>
-        <p class="text-gray-200 mb-4">
-          Your AI coding tool sees every registered action, can execute them against the running app, and reads your
-          guides as context. It's the same interface your frontend uses — no separate tooling layer.
+      <div class="glass-card p-6 rounded-xl mb-8 max-w-4xl mx-auto">
+        <h3 class="text-xl font-semibold text-gray-200 mb-3">Setup</h3>
+        <p class="text-gray-200 mb-4">Set <span class="font-mono text-primary-400">MOONCORE_DEV_MODE=true</span>
+          environment variable on your system and enable <span
+            class="font-mono text-primary-400">mooncore_dev_tools</span>
+          in your
+          config:</p>
+        <pre class="code-block"><code>config :mooncore,
+  mooncore_dev_tools: true,
+  mcp_port: 4040   # default</code></pre>
+        <p class="text-gray-200 mt-3">The MCP endpoint is available at <span
+            class="font-mono text-primary-400">http://localhost:4040/mcp</span> when the server is running.</p>
+      </div>
+
+      <div class="glass-card p-6 rounded-xl mb-8 max-w-4xl mx-auto">
+        <h3 class="text-xl font-semibold text-gray-200 mb-3">Protocol</h3>
+        <p class="text-gray-200 mb-4">Mooncore implements the MCP specification (protocol version
+          <code>2025-03-26</code>) over HTTP POST with JSON-RPC 2.0:
         </p>
-        <div class="code-block">
-          <span class="text-gray-500">// .vscode/mcp.json</span>
-          {
-          <span class="text-green-400">"servers"</span>: {
-          <span class="text-green-400">"mooncore"</span>: {
-          <span class="text-green-400">"type"</span>: <span class="text-yellow-300">"http"</span>,
-          <span class="text-green-400">"url"</span>: <span class="text-yellow-300">"http://localhost:4040/mcp"</span>
-          }
-          }
-          }
-        </div>
+        <pre class="code-block"><code>POST http://localhost:4040/mcp
+Content-Type: application/json
+
+{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}</code></pre>
+
+        <p class="text-gray-200 mb-2">Supported JSON-RPC methods include:</p>
+        <ul class="text-gray-200 mb-4 list-disc pl-6">
+          <li><strong>initialize</strong> — Handshake: protocol version, capabilities, server info</li>
+          <li><strong>ping</strong> — Keepalive</li>
+          <li><strong>tools/list</strong> — List available tools</li>
+          <li><strong>tools/call</strong> — Call a tool by name</li>
+          <li><strong>resources/list</strong> and <strong>resources/read</strong> — Browse read-only resources</li>
+        </ul>
+
+        <p class="text-gray-200 mb-4">Example initialize response:</p>
+        <pre class="code-block"><code>{
+  "protocolVersion": "2025-03-26",
+  "capabilities": { "tools": {}, "resources": {} },
+  "serverInfo": { "name": "mooncore", "version": "0.2.0" }
+}</code></pre>
+      </div>
+
+      <div class="glass-card p-6 rounded-xl mb-8 max-w-4xl mx-auto">
+        <h3 class="text-xl font-semibold text-gray-200 mb-3">Tools</h3>
+        <p class="text-gray-200 mb-3">Tools are callable operations that can modify state or execute code.</p>
+
+        <h4 class="text-gray-200 font-semibold mb-2">run_action</h4>
+        <pre class="code-block"><code>{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "run_action",
+    "arguments": {
+      "action": "task.create",
+      "params": {"title": "New task"},
+      "auth": {"roles": ["user"], "user": "alice"}
+    }
+  }
+}</code></pre>
+
+        <h4 class="text-gray-200 font-semibold mb-2">eval</h4>
+        <pre class="code-block"><code>{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "eval",
+    "arguments": { "code": "Enum.map(1..5, & &1 * 2)" }
+  }
+}</code></pre>
+
+        <h4 class="text-gray-200 font-semibold mb-2">read_logs / clear_logs</h4>
+        <pre class="code-block"><code>{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "read_logs",
+    "arguments": { "tag": "action", "since_id": 42 }
+  }
+}</code></pre>
+      </div>
+
+      <div class="glass-card p-6 rounded-xl mb-8 max-w-4xl mx-auto">
+        <h3 class="text-xl font-semibold text-gray-200 mb-3">Resources</h3>
+        <p class="text-gray-200 mb-3">Read-only resources provide context about the running application.</p>
+        <pre class="code-block"><code>{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "resources/read",
+  "params": { "uri": "mooncore://actions" }
+}</code></pre>
+        <p class="text-gray-200">Examples: <span class="font-mono">mooncore://actions</span>, <span
+            class="font-mono">mooncore://apps</span>, <span class="font-mono">mooncore://clients</span>, <span
+            class="font-mono">mooncore://config</span>.</p>
+      </div>
+
+      <div class="glass-card p-6 rounded-xl mb-8 max-w-4xl mx-auto">
+        <h3 class="text-xl font-semibold text-gray-200 mb-3">VS Code Integration</h3>
+        <p class="text-gray-200 mb-3">Add the MCP server to your editor integration in <span
+            class="font-mono">.vscode/mcp.json</span>:</p>
+        <pre class="code-block"><code>{
+  "servers": {
+    "mooncore": {
+      "type": "http",
+      "url": "http://localhost:4040/mcp"
+    }
+  }
+}</code></pre>
+      </div>
+
+      <div class="glass-card p-6 rounded-xl mb-8 max-w-4xl mx-auto">
+        <h3 class="text-xl font-semibold text-gray-200 mb-3">JSON API</h3>
+        <p class="text-gray-200 mb-3">The dev server also exposes a simpler JSON API on the same port for direct HTTP
+          access.</p>
+        <pre class="code-block"><code>POST /api/mcp    — Generic MCP request
+POST /api/eval   — Evaluate Elixir code
+POST /api/action — Execute an action
+GET  /api/logs   — Read logs (query: tag, since)
+GET  /api/actions— List all actions
+GET  /api/config — Get server config</code></pre>
+      </div>
+
+      <div class="glass-card p-6 rounded-xl mb-8 max-w-4xl mx-auto">
+        <h3 class="text-xl font-semibold text-gray-200 mb-3">Watcher</h3>
+        <p class="text-gray-200 mb-3">The Watcher collects in-memory logs (ring buffer) used by the dashboard and MCP
+          log tools.</p>
+        <pre class="code-block"><code>Mooncore.MCP.Watcher.log(:custom, %{message: "Something happened"})
+Mooncore.MCP.Watcher.read(:action)
+Mooncore.MCP.Watcher.read_since(42)</code></pre>
+      </div>
+
+      <div class="glass-card p-6 rounded-xl mb-8 max-w-4xl mx-auto">
+        <h3 class="text-xl font-semibold text-gray-200 mb-3">Elixir API</h3>
+        <pre class="code-block"><code>Mooncore.MCP.Server.list_actions()
+Mooncore.MCP.Server.list_clients()
+Mooncore.MCP.Server.server_info()
+Mooncore.MCP.Server.run_action("task.create", %{"title" => "Test"}, nil)
+Mooncore.MCP.Server.eval_code("1 + 1")
+Mooncore.MCP.Server.read_logs(%{"tag" => "action"})</code></pre>
+        <p class="text-gray-200 mt-3">All functions require <span class="font-mono">mooncore_dev_tools: true</span> and
+          will error when disabled.</p>
       </div>
     </div>
   </section>
@@ -563,6 +619,13 @@
           </div>
         </div>
       </div>
+
+      <div class="bg-primary-500/10 p-6 rounded-xl border border-primary-500/30">
+        <p class="text-gray-200">
+          <span class="text-primary-400 font-semibold">Note:</span> If you need server-rendered HTML, Phoenix is the
+          better choice. Mooncore handles the API layer and gets out of the way of everything else.
+        </p>
+      </div>
     </div>
   </section>
 
@@ -587,7 +650,7 @@
             Copy paste this prompt to your favorite AI coding agent and watch it build a working app:
           </p>
           <div class="code-block">
-            Create a simple to-do app using https://hexdocs.pm/mooncore/ and start with devmode: true
+            Create a simple to-do app using https://hexdocs.pm/mooncore/ and start with mooncore_dev_tools: true
           </div>
         </div>
 
@@ -611,7 +674,7 @@
                 <span class="text-green-400">port:</span> 4000,
                 <span class="text-green-400">router:</span> MyApp.Router,
                 <span class="text-green-400">app_module:</span> MyApp.App,
-                <span class="text-green-400">devmode:</span> <span class="text-purple-400">true</span>,
+                <span class="text-green-400">mooncore_dev_tools:</span> <span class="text-purple-400">true</span>,
                 <span class="text-green-400">mcp_port:</span> 4040
               </div>
             </div>
