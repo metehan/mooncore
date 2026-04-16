@@ -41,16 +41,16 @@ config :mooncore,
 
 Mooncore tokens contain these claims:
 
-| Claim | Type | Description |
-|-------|------|-------------|
-| `user` | string | User identifier |
-| `app` | string | App key — routes to the correct action module |
-| `dkey` | string | Domain/tenant key — for multi-tenant isolation |
-| `scope` | string | Data scope — further isolation within a domain |
-| `roles` | string | Base58-encoded bitmask of user roles |
-| `aud` | string | Audience — always `"api"` |
-| `iss` | string | Issuer — must match configured issuer |
-| `exp` | integer | Expiry timestamp (default: 18 hours from creation) |
+| Claim   | Type    | Description                                        |
+| ------- | ------- | -------------------------------------------------- |
+| `user`  | string  | User identifier                                    |
+| `app`   | string  | App key — routes to the correct action module      |
+| `dkey`  | string  | Domain/tenant key — for multi-tenant isolation     |
+| `scope` | string  | Data scope — further isolation within a domain     |
+| `roles` | string  | Base58-encoded bitmask of user roles               |
+| `aud`   | string  | Audience — always `"api"`                          |
+| `iss`   | string  | Issuer — must match configured issuer              |
+| `exp`   | integer | Expiry timestamp (default: 18 hours from creation) |
 
 ## Creating Tokens
 
@@ -60,8 +60,8 @@ roles = ["admin", "user", "editor", "viewer"]
 
 # Encode the user's roles as a Base58 bitmask
 user_roles = ["user", "editor"]
-encoded_roles = Mooncore.Util.Base58.encode(
-  Mooncore.Util.Deflist.encode(user_roles, roles)
+encoded_roles = Mooncore.Util.Base58.from_integer(
+  Mooncore.Util.Deflist.to_integer(roles, user_roles)
 )
 
 # Create the token
@@ -141,11 +141,11 @@ all_roles = ["admin", "user", "editor", "viewer"]
 user_roles = ["user", "editor"]
 
 # Encode: roles → integer
-bitmask = Mooncore.Util.Deflist.encode(user_roles, all_roles)
+bitmask = Mooncore.Util.Deflist.to_integer(all_roles, user_roles)
 # 6
 
-# Decode: integer → roles
-decoded = Mooncore.Util.Deflist.decode(bitmask, all_roles)
+# Decode: integer -> roles
+decoded = Mooncore.Util.Deflist.from_integer(bitmask, all_roles)
 # ["user", "editor"]
 ```
 
@@ -155,11 +155,11 @@ decoded = Mooncore.Util.Deflist.decode(bitmask, all_roles)
 
 ```elixir
 # Encode for JWT storage
-encoded = Mooncore.Util.Base58.encode(6)
+encoded = Mooncore.Util.Base58.from_integer(6)
 # "7"
 
 # Decode from JWT
-decoded = Mooncore.Util.Base58.decode("7")
+decoded = Mooncore.Util.Base58.to_integer("7")
 # 6
 ```
 
@@ -168,8 +168,8 @@ decoded = Mooncore.Util.Base58.decode("7")
 ```elixir
 # At login time — encode roles into token
 all_roles = MyApp.roles()
-bitmask = Mooncore.Util.Deflist.encode(["user", "editor"], all_roles)
-role_string = Mooncore.Util.Base58.encode(bitmask)
+bitmask = Mooncore.Util.Deflist.to_integer(all_roles, ["user", "editor"])
+role_string = Mooncore.Util.Base58.from_integer(bitmask)
 
 {:ok, token} = Mooncore.Auth.Token.new_token(%{
   "user" => "alice",

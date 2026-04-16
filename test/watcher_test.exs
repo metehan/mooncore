@@ -2,10 +2,10 @@ defmodule Mooncore.MCP.WatcherTest do
   use ExUnit.Case
 
   @moduletag skip:
-               if(System.get_env("MOONCORE_DEV_MODE") == "true",
+               if(System.get_env("MOONCORE_DEV_TOOLS") == "true",
                  do: false,
                  else:
-                   "MOONCORE_DEV_MODE=true not set — run with: MOONCORE_DEV_MODE=true mix test"
+                   "MOONCORE_DEV_TOOLS=true not set — run with: MOONCORE_DEV_TOOLS=true mix test"
                )
 
   setup do

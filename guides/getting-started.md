@@ -9,7 +9,7 @@ Add Mooncore to your dependencies in `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:mooncore, "~> 0.1.0"}
+    {:mooncore, "~> 0.2.0"}
   ]
 end
 ```
@@ -62,16 +62,16 @@ config :mooncore,
 
 ### Configuration Keys
 
-| Key                  | Type    | Description                                     |
-| -------------------- | ------- | ----------------------------------------------- |
-| `port`               | integer | HTTP listening port (default: 4000)             |
-| `router`             | module  | Your Plug.Router module                         |
-| `app_module`         | module  | Your App registry module                        |
-| `jwt`                | keyword | `[key: "RSA private key PEM", issuer: "name"]`  |
-| `pools`              | list    | Named client pool atoms (default: `[:default]`) |
-| `before_action`      | list    | Middleware modules run before actions           |
-| `after_action`       | list    | Middleware modules run after actions            |
-| `mooncore_dev_tools` | boolean | Enables dev dashboard and MCP server (also requires `MOONCORE_DEV_MODE=true` env var) |
+| Key                  | Type    | Description                                                                            |
+| -------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `port`               | integer | HTTP listening port (default: 4000)                                                    |
+| `router`             | module  | Your Plug.Router module                                                                |
+| `app_module`         | module  | Your App registry module                                                               |
+| `jwt`                | keyword | `[key: "RSA private key PEM", issuer: "name"]`                                         |
+| `pools`              | list    | Named client pool atoms (default: `[:default]`)                                        |
+| `before_action`      | list    | Middleware modules run before actions                                                  |
+| `after_action`       | list    | Middleware modules run after actions                                                   |
+| `mooncore_dev_tools` | boolean | Enables dev dashboard and MCP server (also requires `MOONCORE_DEV_TOOLS=true` env var) |
 
 ## Step 1: Define Your App
 
@@ -242,8 +242,8 @@ For actions that require roles, you need a JWT token. In IEx:
   "app" => "myapp",
   "dkey" => "my-domain",
   "scope" => "default",
-  "roles" => Mooncore.Util.Base58.encode(
-    Mooncore.Util.Deflist.encode(["user"], ["admin", "user", "editor"])
+  "roles" => Mooncore.Util.Base58.from_integer(
+    Mooncore.Util.Deflist.to_integer(["admin", "user", "editor"], ["user"])
   )
 })
 ```

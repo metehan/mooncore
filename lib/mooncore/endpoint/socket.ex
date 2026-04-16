@@ -44,6 +44,7 @@ defmodule Mooncore.Endpoint.Socket do
           action: message["action"],
           rayid: message["rayid"],
           socket_pid: state.pid,
+          source: "ws",
           params: message
         }
       )

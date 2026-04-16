@@ -93,17 +93,17 @@ CMD ["bin/my_app", "start"]
 
 ## Environment Variables
 
-| Variable              | Description                                                                 |
-| --------------------- | --------------------------------------------------------------------------- |
-| `PORT`                | HTTP listening port                                                         |
-| `JWT_PRIVATE_KEY`     | RSA private key PEM for JWT signing                                         |
-| `JWT_ISSUER`          | JWT issuer claim                                                            |
-| `SECRET_KEY_BASE`     | For cookie signing if you use Plug sessions                                 |
-| `MOONCORE_DEV_MODE`   | Must be `"true"` to enable dev tools (used with `mooncore_dev_tools: true`) |
+| Variable             | Description                                                                 |
+| -------------------- | --------------------------------------------------------------------------- |
+| `PORT`               | HTTP listening port                                                         |
+| `JWT_PRIVATE_KEY`    | RSA private key PEM for JWT signing                                         |
+| `JWT_ISSUER`         | JWT issuer claim                                                            |
+| `SECRET_KEY_BASE`    | For cookie signing if you use Plug sessions                                 |
+| `MOONCORE_DEV_TOOLS` | Must be `"true"` to enable dev tools (used with `mooncore_dev_tools: true`) |
 
 ### Why Two Gates?
 
-Dev tools require both `config :mooncore, mooncore_dev_tools: true` AND `MOONCORE_DEV_MODE=true`. This prevents accidental exposure in production — even if a config file is misconfigured or copied from dev, the environment variable acts as a second safety gate. The config says "this environment is allowed to have dev tools" and the env var says "this specific deployment instance has dev tools turned on."
+Dev tools require both `config :mooncore, mooncore_dev_tools: true` AND `MOONCORE_DEV_TOOLS=true`. This prevents accidental exposure in production — even if a config file is misconfigured or copied from dev, the environment variable acts as a second safety gate. The config says "this environment is allowed to have dev tools" and the env var says "this specific deployment instance has dev tools turned on."
 
 ## Health Checks
 

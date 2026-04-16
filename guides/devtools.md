@@ -9,7 +9,7 @@ Mooncore includes a built-in development dashboard for real-time observability o
 Dev tools require **two gates** to be open:
 
 1. **Config gate** — `mooncore_dev_tools: true` in your application config
-2. **Environment gate** — `MOONCORE_DEV_MODE=true` environment variable
+2. **Environment gate** — `MOONCORE_DEV_TOOLS=true` environment variable
 
 Both must be set. This two-gate system ensures dev tools can't accidentally be enabled in production through a misconfigured config file alone.
 
@@ -22,14 +22,14 @@ config :mooncore,
 
 ```bash
 # Set the environment variable before starting the app
-export MOONCORE_DEV_MODE=true
+export MOONCORE_DEV_TOOLS=true
 mix run --no-halt
 ```
 
 Or inline:
 
 ```bash
-MOONCORE_DEV_MODE=true mix run --no-halt
+MOONCORE_DEV_TOOLS=true mix run --no-halt
 ```
 
 When both gates are open, a dedicated HTTP server starts on `mcp_port` (default 4040). Open `http://localhost:4040/` in your browser.

@@ -17,18 +17,14 @@ defmodule Mooncore.Dev.RequestLogger do
     if Mooncore.mooncore_dev_tools_enabled?() do
       params = Map.drop(request[:params] || %{}, ["action"])
       auth = request[:auth]
-
-      source =
-        cond do
-          Map.has_key?(request, :socket_pid) -> "ws"
-          true -> "http"
-        end
+      source = detect_source(request)
 
       try do
         Mooncore.MCP.Watcher.log(:action, %{
           action: action,
           params: params,
           auth: auth,
+          ip: request[:ip],
           source: source,
           response: sanitize_response(response),
           duration: duration
@@ -39,6 +35,15 @@ defmodule Mooncore.Dev.RequestLogger do
     end
 
     :ok
+  end
+
+  defp detect_source(request) do
+    cond do
+      is_binary(request[:source]) -> request[:source]
+      is_atom(request[:source]) -> Atom.to_string(request[:source])
+      Map.has_key?(request, :socket_pid) -> "ws"
+      true -> "elixir"
+    end
   end
 
   defp sanitize_response(resp) when is_map(resp) do

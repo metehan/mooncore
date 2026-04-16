@@ -40,12 +40,12 @@ defmodule Mooncore do
 
   Requires BOTH:
   - `config :mooncore, mooncore_dev_tools: true`
-  - `MOONCORE_DEV_MODE=true` environment variable
+  - `MOONCORE_DEV_TOOLS=true` environment variable
 
   This two-gate system prevents accidental exposure of dev tools
   when deploying to a server with a misconfigured config.
   """
   def mooncore_dev_tools_enabled? do
-    config(:mooncore_dev_tools, false) == true and System.get_env("MOONCORE_DEV_MODE") == "true"
+    config(:mooncore_dev_tools, false) == true and System.get_env("MOONCORE_DEV_TOOLS") == "true"
   end
 end

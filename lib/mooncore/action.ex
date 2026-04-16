@@ -76,6 +76,8 @@ defmodule Mooncore.Action do
   When `params["mooncore_log"]` is truthy, logs the entire lifecycle with timestamps.
   """
   def execute(action, request) do
+    request = enrich_request(action, request)
+
     should_log =
       get_in(request, [:params, "mooncore_log"]) == true or
         get_in(request, [:params, "mooncore_log"]) == "true"
@@ -83,24 +85,31 @@ defmodule Mooncore.Action do
     log_entry = if should_log, do: lifecycle_start(action, request), else: nil
 
     start = System.monotonic_time(:millisecond)
+    previous_execute = Process.get(:mooncore_action_execute)
 
-    result =
-      request
-      |> run_hooks(:before_action)
-      |> tap(fn req -> if log_entry, do: lifecycle_phase(log_entry, :after_hooks, req) end)
-      |> then(fn req -> dispatch_to_app(action, req) end)
-      |> tap(fn resp -> if log_entry, do: lifecycle_phase(log_entry, :action_result, resp) end)
-      |> run_hooks(:after_action)
-      |> tap(fn resp -> if log_entry, do: lifecycle_end(log_entry, resp) end)
+    Process.put(:mooncore_action_execute, true)
 
-    Mooncore.Dev.RequestLogger.log_action(
-      action,
-      request,
-      result,
-      System.monotonic_time(:millisecond) - start
-    )
+    try do
+      result =
+        request
+        |> run_hooks(:before_action)
+        |> tap(fn req -> if log_entry, do: lifecycle_phase(log_entry, :after_hooks, req) end)
+        |> then(fn req -> dispatch_to_app(action, req) end)
+        |> tap(fn resp -> if log_entry, do: lifecycle_phase(log_entry, :action_result, resp) end)
+        |> run_hooks(:after_action)
+        |> tap(fn resp -> if log_entry, do: lifecycle_end(log_entry, resp) end)
 
-    result
+      Mooncore.Dev.RequestLogger.log_action(
+        action,
+        request,
+        result,
+        System.monotonic_time(:millisecond) - start
+      )
+
+      result
+    after
+      restore_process_flag(:mooncore_action_execute, previous_execute)
+    end
   end
 
   defp lifecycle_start(action, request) do
@@ -186,6 +195,34 @@ defmodule Mooncore.Action do
   This is the core dispatcher — role check, deep merge, apply.
   """
   def dispatch(module, action, request) do
+    request = enrich_request(action, request)
+
+    if Process.get(:mooncore_action_execute) || Process.get(:mooncore_direct_dispatch) do
+      do_dispatch(module, action, request)
+    else
+      previous_direct = Process.get(:mooncore_direct_dispatch)
+      start = System.monotonic_time(:millisecond)
+
+      Process.put(:mooncore_direct_dispatch, true)
+
+      try do
+        result = do_dispatch(module, action, request)
+
+        Mooncore.Dev.RequestLogger.log_action(
+          action,
+          request,
+          result,
+          System.monotonic_time(:millisecond) - start
+        )
+
+        result
+      after
+        restore_process_flag(:mooncore_direct_dispatch, previous_direct)
+      end
+    end
+  end
+
+  defp do_dispatch(module, action, request) do
     case Map.get(module.actions_map(), action) do
       {handler_mod, function, [], req_mod} ->
         merged_request = deep_merge_request(request, req_mod)
@@ -299,4 +336,25 @@ defmodule Mooncore.Action do
   end
 
   defp deep_merge(_key, _val1, val2), do: val2
+
+  defp enrich_request(action, request) do
+    request
+    |> Map.update(:params, %{"action" => action}, fn
+      params when is_map(params) -> Map.put_new(params, "action", action)
+      _ -> %{"action" => action}
+    end)
+    |> Map.put_new(:source, default_source(request))
+  end
+
+  defp default_source(request) do
+    cond do
+      is_binary(request[:source]) -> request[:source]
+      is_atom(request[:source]) -> Atom.to_string(request[:source])
+      Map.has_key?(request, :socket_pid) -> "ws"
+      true -> "elixir"
+    end
+  end
+
+  defp restore_process_flag(key, nil), do: Process.delete(key)
+  defp restore_process_flag(key, previous), do: Process.put(key, previous)
 end

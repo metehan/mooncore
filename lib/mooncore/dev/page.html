@@ -202,6 +202,24 @@
     .log-new {
       animation: fadeIn 0.2s ease-out;
     }
+
+    @keyframes guideRunPulse {
+
+      0%,
+      100% {
+        border-color: #065f46;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.1);
+      }
+
+      50% {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+      }
+    }
+
+    .eval-running {
+      animation: guideRunPulse 1.2s ease-in-out infinite;
+    }
   </style>
 </head>
 
@@ -244,6 +262,13 @@
       return r.json();
     }
 
+    function destroyCodeMirror(instance) {
+      if (!instance) return null;
+      const wrapper = instance.getWrapperElement ? instance.getWrapperElement() : null;
+      if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+      return null;
+    }
+
     /* ─── Menu items ─── */
     const ICONS = {
       dashboard: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
@@ -254,6 +279,7 @@
       clients: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
       console: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
       files: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+      ets: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
     };
 
     const MENU = [
@@ -262,6 +288,7 @@
       { id: 'actions', label: 'Actions' },
       { id: 'tools', label: 'Tools' },
       { id: 'guides', label: 'Guides' },
+      { id: 'ets', label: 'ETS' },
       { id: 'clients', label: 'Clients' },
       { id: 'console', label: 'Console' },
       { id: 'files', label: 'Files' },
@@ -333,10 +360,11 @@
     <div class="flex flex-1 overflow-hidden h-screen">
       <!-- Left Menu -->
       <div class="w-44 border-r border-gray-800 bg-gray-900 flex flex-col shrink-0">
-        <div class="px-4 py-3 border-b border-gray-800 flex items-center gap-2.5">
+        <button class="px-4 py-3 border-b border-gray-800 flex items-center gap-2.5 bg-transparent border-x-0 border-t-0 cursor-pointer text-left hover:bg-gray-800/40 transition-colors"
+          onClick=${() => setPage('dashboard')}>
           <img src="${BASE}/assets/mooncore.png" alt="Mooncore" class="w-7 h-7 rounded" />
           <span class="text-sm font-bold text-violet-400">Mooncore</span>
-        </div>
+        </button>
         <nav class="flex-1 py-2">
           ${MENU.map(m => html`
             <button key=${m.id}
@@ -361,6 +389,7 @@
           setAction=${setRunnerAction} setParams=${setRunnerParams} setAuth=${setRunnerAuth} onToEval=${toEval} />`}
         ${page === 'tools' && html`<${ToolsPage} />`}
         ${page === 'guides' && html`<${GuidesPage} />`}
+        ${page === 'ets' && html`<${EtsPage} />`}
         ${page === 'clients' && html`<${ClientsPage} />`}
         ${page === 'console' && html`<${ConsolePage} initialInput=${consoleInput} onConsumeInput=${() => setConsoleInput('')} />`}
         ${page === 'files' && html`<${FilesPage} onOpenFile=${openFile} />`}
@@ -477,7 +506,7 @@
       const [prevSnap, setPrevSnap] = useState(null);
       const [cpuPct, setCpuPct] = useState([]);
       const [cpuRatio, setCpuRatio] = useState(0);
-      const [tab, setTab] = useState('overview'); // overview | processes | ets | apps
+      const [tab, setTab] = useState('overview'); // overview | processes | ets | apps | topology
       const intervalRef = useRef(null);
       const MAX_HIST = 30;
 
@@ -533,14 +562,14 @@
         <span class="text-xs text-gray-500">Loading dashboard...</span>
       </div>`;
 
-      const { memory, vm, top_processes, ets_tables, applications } = data;
+      const { memory, vm, top_processes, applications, topology } = data;
       const avgCpu = cpuRatio;
 
       const tabs = [
         { id: 'overview', label: 'Overview' },
         { id: 'processes', label: 'Processes (' + (top_processes || []).length + ')' },
-        { id: 'ets', label: 'ETS (' + (ets_tables || []).length + ')' },
         { id: 'apps', label: 'Apps (' + (applications || []).length + ')' },
+        { id: 'topology', label: 'Topology (' + ((topology && topology.root_count) || 0) + ')' },
       ];
 
       return html`
@@ -563,8 +592,8 @@
       <div class="flex-1 overflow-y-auto">
         ${tab === 'overview' && html`<${DashOverview} data=${data} history=${history} cpuPct=${cpuPct} avgCpu=${avgCpu} />`}
         ${tab === 'processes' && html`<${DashProcesses} procs=${top_processes} />`}
-        ${tab === 'ets' && html`<${DashEts} tables=${ets_tables} />`}
         ${tab === 'apps' && html`<${DashApps} apps=${applications} />`}
+        ${tab === 'topology' && html`<${DashTopology} topology=${topology} />`}
       </div>
     </div>
       `;
@@ -707,39 +736,315 @@
       `;
     }
 
-    function DashEts({ tables }) {
-      const totalMem = (tables || []).reduce((s, t) => s + t.memory, 0);
-      const totalRows = (tables || []).reduce((s, t) => s + t.size, 0);
+    function EtsPage() {
+      const [tables, setTables] = useState(null);
+      const [error, setError] = useState(null);
+      const intervalRef = useRef(null);
+
+      const fetchTables = useCallback(async () => {
+        try {
+          const d = await api('/api/dashboard');
+          setTables(d.ets_tables || []);
+        } catch (e) { setError(String(e)); }
+      }, []);
+
+      useEffect(() => {
+        fetchTables();
+        intervalRef.current = setInterval(fetchTables, 5000);
+        return () => clearInterval(intervalRef.current);
+      }, [fetchTables]);
+
+      if (error) return html`<div class="p-6 text-sm text-red-400">${error}</div>`;
+      if (!tables) return html`<div class="flex-1 flex items-center justify-center text-sm text-gray-600">Loading...</div>`;
+
+      return html`<${EtsTableBrowser} tables=${tables} />`;
+    }
+
+    function EtsTableBrowser({ tables }) {
+      const allTables = tables || [];
+      const totalMem = allTables.reduce((s, t) => s + t.memory, 0);
+      const totalRows = allTables.reduce((s, t) => s + t.size, 0);
+      const [tableQuery, setTableQuery] = useState('');
+      const [showEmpty, setShowEmpty] = useState(false);
+      const [selectedId, setSelectedId] = useState(null);
+      const [rowFilter, setRowFilter] = useState('');
+      const [page, setPage] = useState(1);
+      const [rows, setRows] = useState([]);
+      const [meta, setMeta] = useState({ total_matching: 0, total_pages: 1, has_prev: false, has_next: false });
+      const [loadingRows, setLoadingRows] = useState(false);
+      const [rowError, setRowError] = useState(null);
+      const [showInsert, setShowInsert] = useState(false);
+      const [insertTerm, setInsertTerm] = useState('');
+      const [insertError, setInsertError] = useState(null);
+      const [insertLoading, setInsertLoading] = useState(false);
+
+      const emptyCount = useMemo(() => allTables.filter(t => t.size === 0).length, [allTables]);
+
+      const filteredTables = useMemo(() => {
+        const query = tableQuery.trim().toLowerCase();
+        let list = showEmpty ? allTables : allTables.filter(t => t.size > 0);
+        if (!query) return list;
+        return list.filter(t => `${t.name} ${t.type} ${t.protection}`.toLowerCase().includes(query));
+      }, [allTables, tableQuery, showEmpty]);
+
+      const selectedTable = useMemo(() => {
+        return filteredTables.find(t => t.id === selectedId) || filteredTables[0] || null;
+      }, [filteredTables, selectedId]);
+
+      useEffect(() => {
+        if (selectedTable && selectedId !== selectedTable.id) setSelectedId(selectedTable.id);
+        if (!selectedTable && selectedId !== null) setSelectedId(null);
+      }, [selectedTable, selectedId]);
+
+      useEffect(() => { setPage(1); }, [selectedId, rowFilter]);
+
+      useEffect(() => {
+        let cancelled = false;
+        async function loadRows() {
+          if (!selectedTable) { setRows([]); setRowError(null); setMeta({ total_matching: 0, total_pages: 1, has_prev: false, has_next: false }); return; }
+          setLoadingRows(true); setRowError(null);
+          try {
+            const d = await api(`/api/ets/rows?table=${encodeURIComponent(selectedTable.id)}&filter=${encodeURIComponent(rowFilter)}&page=${page}&limit=50`);
+            if (cancelled) return;
+            if (d.ok) { setRows(d.rows || []); setMeta({ total_matching: d.total_matching || 0, total_pages: d.total_pages || 1, has_prev: !!d.has_prev, has_next: !!d.has_next }); }
+            else { setRows([]); setMeta({ total_matching: 0, total_pages: 1, has_prev: false, has_next: false }); setRowError(d.error || 'Could not load rows'); }
+          } catch (e) { if (!cancelled) { setRows([]); setMeta({ total_matching: 0, total_pages: 1, has_prev: false, has_next: false }); setRowError(String(e)); } }
+          if (!cancelled) setLoadingRows(false);
+        }
+        loadRows();
+        return () => { cancelled = true; };
+      }, [selectedTable ? selectedTable.id : null, rowFilter, page]);
+
+      async function deleteRow(keyPreview) {
+        if (!selectedTable) return;
+        const d = await api('/api/ets/delete', { body: { table: selectedTable.id, key: keyPreview } });
+        if (d.ok) setPage(p => p); // trigger reload
+        else alert(d.error);
+      }
+
+      async function insertRow() {
+        if (!selectedTable || !insertTerm.trim()) return;
+        setInsertLoading(true); setInsertError(null);
+        const d = await api('/api/ets/insert', { body: { table: selectedTable.id, term: insertTerm } });
+        setInsertLoading(false);
+        if (d.ok) { setInsertTerm(''); setShowInsert(false); setPage(1); }
+        else setInsertError(d.error);
+      }
+
       return html`
-      <div >
-      <div class="px-4 py-2 border-b border-gray-800 flex items-center gap-3 bg-gray-900/30">
-        <span class="text-xs text-gray-500">Total: ${fmtBytes(totalMem)}</span>
-        <span class="text-xs text-gray-500">${fmtNum(totalRows)} rows</span>
+      <div class="h-full flex min-h-0">
+        <div class="w-72 border-r border-gray-800 bg-gray-900/50 shrink-0 flex flex-col">
+          <${SectionHeader} title="ETS Tables" count=${filteredTables.length} />
+          <div class="px-4 py-3 border-b border-gray-800 bg-gray-950/40 space-y-3">
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="rounded-lg border border-gray-800 bg-gray-900 px-3 py-2">
+                <div class="text-gray-500">Memory</div>
+                <div class="text-gray-200 font-mono mt-1">${fmtBytes(totalMem)}</div>
+              </div>
+              <div class="rounded-lg border border-gray-800 bg-gray-900 px-3 py-2">
+                <div class="text-gray-500">Rows</div>
+                <div class="text-gray-200 font-mono mt-1">${fmtNum(totalRows)}</div>
+              </div>
+            </div>
+            <input value=${tableQuery} onInput=${e => setTableQuery(e.target.value)} placeholder="Filter tables"
+              class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200" />
+          </div>
+          <div class="flex-1 overflow-y-auto">
+            ${filteredTables.length === 0
+          ? html`<div class="p-5 text-sm text-gray-600">No ETS tables match the current filter.</div>`
+          : filteredTables.map(t => html`
+                <button key=${t.id}
+                  class="group w-full text-left px-4 py-3 bg-transparent border-x-0 border-t-0 border-b border-gray-800/30 cursor-pointer transition-colors ${selectedTable && selectedTable.id === t.id ? 'bg-violet-500/10' : 'hover:bg-gray-800/40'}"
+                  onClick=${() => setSelectedId(t.id)}>
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="text-xs font-mono ${selectedTable && selectedTable.id === t.id ? 'text-violet-300' : 'text-violet-400'} break-all">${t.name}</div>
+                      <div class="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
+                        <span>${t.type}</span>
+                        <span>${fmtNum(t.size)} rows</span>
+                      </div>
+                    </div>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded-full ${t.protection === 'public' ? 'bg-emerald-500/10 text-emerald-300' : t.protection === 'protected' ? 'bg-cyan-500/10 text-cyan-300' : 'bg-amber-500/10 text-amber-300'}">${t.protection}</span>
+                  </div>
+                </button>
+              `)
+        }
+            ${!showEmpty && emptyCount > 0 && html`
+              <div class="px-4 py-3 text-[11px] text-gray-600">
+                ${emptyCount} table${emptyCount === 1 ? '' : 's'} with no records hidden.${' '}
+                <button class="text-gray-500 underline bg-transparent border-none cursor-pointer p-0" onClick=${() => setShowEmpty(true)}>Show all tables</button>
+              </div>
+            `}
+          </div>
+        </div>
+
+        <div class="flex-1 min-w-0 flex flex-col bg-gray-950/30">
+          ${selectedTable ? html`
+            <div class="px-5 py-3 border-b border-gray-800 bg-gray-950/40 shrink-0 space-y-3">
+              <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="text-sm font-mono text-violet-300 break-all">${selectedTable.name}</div>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-900 border border-gray-800 text-gray-400">${selectedTable.type}</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full ${selectedTable.protection === 'public' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : selectedTable.protection === 'protected' ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'}">${selectedTable.protection}</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0 text-xs text-gray-500">
+                  <span>${fmtNum(selectedTable.size)} rows</span>
+                  <span>${fmtBytes(selectedTable.memory)}</span>
+                  ${selectedTable.protection !== 'private' && html`
+                    <button class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-300 cursor-pointer"
+                      onClick=${() => { setShowInsert(v => !v); setInsertError(null); }}>+ Insert</button>
+                  `}
+                </div>
+              </div>
+              ${showInsert && html`
+                <div class="space-y-2">
+                  <textarea value=${insertTerm} onInput=${e => setInsertTerm(e.target.value)} rows="3"
+                    placeholder='Elixir term, e.g. {:my_key, "hello", 42}'
+                    class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-200 resize-none" />
+                  ${insertError && html`<div class="text-xs text-red-400">${insertError}</div>`}
+                  <div class="flex gap-2">
+                    <button class="px-3 py-1.5 text-xs rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 cursor-pointer disabled:opacity-40" onClick=${insertRow} disabled=${insertLoading}>${insertLoading ? 'Inserting…' : 'Insert'}</button>
+                    <button class="px-3 py-1.5 text-xs rounded-lg border border-gray-800 bg-gray-900 text-gray-400 cursor-pointer" onClick=${() => { setShowInsert(false); setInsertError(null); setInsertTerm(''); }}>Cancel</button>
+                  </div>
+                </div>
+              `}
+              <div class="flex items-center gap-3">
+                <input value=${rowFilter} onInput=${e => setRowFilter(e.target.value)} placeholder="Filter rows"
+                  class="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200" />
+                <button class="px-3 py-1.5 text-xs rounded-lg border border-gray-800 bg-gray-900 text-gray-300 disabled:opacity-40" onClick=${() => setPage(p => Math.max(1, p - 1))} disabled=${!meta.has_prev || loadingRows}>Prev</button>
+                <div class="text-xs text-gray-500 whitespace-nowrap">${page} / ${meta.total_pages || 1}</div>
+                <button class="px-3 py-1.5 text-xs rounded-lg border border-gray-800 bg-gray-900 text-gray-300 disabled:opacity-40" onClick=${() => setPage(p => p + 1)} disabled=${!meta.has_next || loadingRows}>Next</button>
+              </div>
+            </div>
+            <div class="flex-1 overflow-y-auto px-5 py-4">
+              ${loadingRows
+            ? html`<div class="text-sm text-gray-500">Loading…</div>`
+            : rowError
+              ? html`<div class="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-300">${rowError}</div>`
+              : rows.length === 0
+                ? html`<div class="text-sm text-gray-500">No rows match.</div>`
+                : html`<div class="space-y-1">${rows.map(row => html`<${EtsRowCard} key=${row.index} row=${row} tableId=${selectedTable.id} protection=${selectedTable.protection} onDelete=${deleteRow} onReload=${() => setPage(p => p)} />`)}</div>`}
+            </div>
+          ` : html`<div class="flex-1 flex items-center justify-center text-sm text-gray-600">Select an ETS table to inspect it.</div>`}
+        </div>
       </div>
-      <table>
-        <thead>
-          <tr class="border-b border-gray-800 bg-gray-900/50">
-            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Name</th>
-            <th class="px-4 py-2 text-xs text-gray-500 font-medium text-right">Rows</th>
-            <th class="px-4 py-2 text-xs text-gray-500 font-medium text-right">Memory</th>
-            <th class="px-4 py-2 text-xs text-gray-500 font-medium">Type</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${(tables || []).map((t, i) => html`
-            <tr key=${i} class="border-b border-gray-800/40 hover:bg-gray-800/30 transition-colors">
-              <td class="px-4 py-2">
-                <div class="text-xs font-mono text-violet-400">${t.name}</div>
-              </td>
-              <td class="px-4 py-2 text-xs text-gray-300 text-right font-mono">${fmtNum(t.size)}</td>
-              <td class="px-4 py-2 text-xs text-gray-300 text-right font-mono">${fmtBytes(t.memory)}</td>
-              <td class="px-4 py-2 text-xs text-gray-500">${t.type}</td>
-            </tr>
-          `)}
-        </tbody>
-      </table>
-    </div>
       `;
+    }
+
+    function EtsRowCard({ row, tableId, protection, onDelete, onReload }) {
+      const [open, setOpen] = useState(false);
+      const [deleting, setDeleting] = useState(false);
+
+      // Extract key term string (first element of outermost tuple, or full row for non-tuple)
+      function keyTerm() {
+        if (row.term && row.term.kind === 'tuple' && row.term.items && row.term.items.length > 0) {
+          const keyNode = row.term.items[0];
+          if (keyNode.kind === 'atom' || keyNode.kind === 'inspect') return keyNode.value;
+          if (keyNode.kind === 'scalar') return String(keyNode.value);
+          if (keyNode.kind === 'binary') return JSON.stringify(keyNode.value);
+        }
+        return row.preview.split('\n')[0];
+      }
+
+      async function handleDelete() {
+        if (!confirm('Delete this row?')) return;
+        setDeleting(true);
+        await onDelete(keyTerm());
+        setDeleting(false);
+        onReload();
+      }
+
+      return html`
+      <div class="rounded-lg border border-gray-800/60 bg-gray-900/60 overflow-hidden">
+        <div class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-gray-800/30 transition-colors"
+          onClick=${() => setOpen(v => !v)}>
+          <span class="text-gray-600 text-[10px] shrink-0">${open ? '▾' : '▸'}</span>
+          <pre class="flex-1 min-w-0 text-xs font-mono text-gray-300 whitespace-nowrap overflow-hidden text-ellipsis">${row.preview.split('\n')[0]}</pre>
+          <span class="text-[10px] font-mono text-gray-600 shrink-0">${fmtBytes(row.bytes)}</span>
+          ${protection === 'public' && html`
+            <button class="text-[10px] px-1.5 py-0.5 rounded border border-red-500/20 bg-red-500/5 text-red-400 cursor-pointer disabled:opacity-40 shrink-0"
+              onClick=${e => { e.stopPropagation(); handleDelete(); }} disabled=${deleting}>
+              ${deleting ? '…' : '✕'}
+            </button>
+          `}
+        </div>
+        ${open && html`
+          <div class="px-4 pb-4 pt-2 border-t border-gray-800/60 bg-gray-950/40">
+            <${EtsTermNode} term=${row.term} depth=${0} />
+          </div>
+        `}
+      </div>
+      `;
+    }
+
+    function EtsTermNode({ term, depth }) {
+      if (!term) return html`<span class="text-xs text-gray-600">null</span>`;
+
+      if (term.kind === 'scalar') {
+        return html`<span class="text-sm font-mono text-gray-200">${String(term.value)}</span>`;
+      }
+
+      if (term.kind === 'atom') {
+        return html`<span class="inline-flex px-2 py-1 rounded-md bg-violet-500/10 text-violet-300 text-xs font-mono">${term.value}</span>`;
+      }
+
+      if (term.kind === 'binary') {
+        return html`
+        <div class="space-y-2">
+          <div class="text-xs text-cyan-300 font-mono">binary <span class="text-gray-500">(${fmtNum(term.length || 0)} bytes)</span></div>
+          <pre class="text-xs text-gray-300 whitespace-pre-wrap break-all bg-gray-950 border border-gray-800 rounded-lg p-3">${term.value}</pre>
+        </div>`;
+      }
+
+      if (term.kind === 'inspect') {
+        return html`<pre class="text-xs text-gray-300 whitespace-pre-wrap break-all bg-gray-950 border border-gray-800 rounded-lg p-3">${term.value}</pre>`;
+      }
+
+      if (term.kind === 'tuple' || term.kind === 'list') {
+        const label = term.kind === 'tuple' ? 'Tuple' : 'List';
+        const items = term.items || [];
+        return html`
+        <details open=${depth < 1} class="rounded-lg border border-gray-800 bg-gray-950/30">
+          <summary class="px-3 py-2 cursor-pointer text-xs text-gray-400 select-none">${label} <span class="text-gray-600">(${term.size})</span></summary>
+          <div class="px-3 pb-3 space-y-2">
+            ${items.map((item, index) => html`
+              <div key=${index} class="flex items-start gap-3 border-l border-gray-800 pl-3">
+                <div class="text-[11px] font-mono text-gray-600 pt-1 shrink-0">${index}</div>
+                <div class="min-w-0 flex-1"><${EtsTermNode} term=${item} depth=${depth + 1} /></div>
+              </div>
+            `)}
+            ${term.truncated && html`<div class="text-xs text-gray-600">Truncated after 25 items.</div>`}
+          </div>
+        </details>`;
+      }
+
+      if (term.kind === 'map') {
+        const entries = term.entries || [];
+        return html`
+        <details open=${depth < 1} class="rounded-lg border border-gray-800 bg-gray-950/30">
+          <summary class="px-3 py-2 cursor-pointer text-xs text-gray-400 select-none">Map <span class="text-gray-600">(${term.size})</span></summary>
+          <div class="px-3 pb-3 space-y-3">
+            ${entries.map((entry, index) => html`
+              <div key=${index} class="rounded-lg border border-gray-800 bg-gray-950/40 overflow-hidden">
+                <div class="px-3 py-2 border-b border-gray-800 text-[11px] uppercase tracking-wider text-gray-500">Entry ${index + 1}</div>
+                <div class="grid grid-cols-2 gap-0">
+                  <div class="p-3 border-r border-gray-800 min-w-0">
+                    <div class="text-[11px] uppercase tracking-wider text-gray-600 mb-2">Key</div>
+                    <${EtsTermNode} term=${entry.key} depth=${depth + 1} />
+                  </div>
+                  <div class="p-3 min-w-0">
+                    <div class="text-[11px] uppercase tracking-wider text-gray-600 mb-2">Value</div>
+                    <${EtsTermNode} term=${entry.value} depth=${depth + 1} />
+                  </div>
+                </div>
+              </div>
+            `)}
+            ${term.truncated && html`<div class="text-xs text-gray-600">Truncated after 25 entries.</div>`}
+          </div>
+        </details>`;
+      }
+
+      return html`<pre class="text-xs text-gray-300 whitespace-pre-wrap break-all bg-gray-950 border border-gray-800 rounded-lg p-3">${JSON.stringify(term, null, 2)}</pre>`;
     }
 
     function DashApps({ apps }) {
@@ -764,6 +1069,95 @@
         </tbody>
       </table>
     </div>
+      `;
+    }
+
+    function DashTopology({ topology }) {
+      if (!topology) {
+        return html`<div class="p-5 text-sm text-gray-600">Topology data unavailable.</div>`;
+      }
+
+      return html`
+      <div class="p-5 space-y-5">
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+            <div class="text-xs text-gray-500">Root Supervisors</div>
+            <div class="text-xl font-bold text-gray-200 mt-1">${topology.root_count || 0}</div>
+          </div>
+          <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+            <div class="text-xs text-gray-500">Registered Supervisors</div>
+            <div class="text-xl font-bold text-gray-200 mt-1">${topology.supervisor_count || 0}</div>
+          </div>
+          <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+            <div class="text-xs text-gray-500">Registered Processes</div>
+            <div class="text-xl font-bold text-gray-200 mt-1">${topology.registered_processes || 0}</div>
+          </div>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Supervisor Tree</span>
+            <span class="text-xs text-gray-600">GenServer, GenStateMachine, and event manager state previews are best-effort snapshots.</span>
+          </div>
+          <div class="p-4 space-y-3">
+            ${(topology.roots || []).length === 0
+          ? html`<div class="text-sm text-gray-600">No registered supervisors found.</div>`
+          : (topology.roots || []).map((node, index) => html`<${TopologyNode} key=${index} node=${node} depth=${0} />`)
+        }
+          </div>
+        </div>
+      </div>
+      `;
+    }
+
+    function TopologyNode({ node, depth }) {
+      const children = node.children || [];
+      const isSupervisor = node.kind === 'supervisor';
+      const kindTone =
+        node.kind === 'gen_server' ? 'text-cyan-400' :
+          node.kind === 'gen_statem' ? 'text-emerald-400' :
+            node.kind === 'gen_event' ? 'text-amber-400' :
+              isSupervisor ? 'text-violet-400' : 'text-gray-400';
+
+      return html`
+      <details class="border border-gray-800 rounded-lg bg-gray-950/60" open=${depth < 2}>
+        <summary class="px-3 py-2 cursor-pointer list-none flex items-start gap-3">
+          <span class="text-gray-600 text-xs mt-0.5">${children.length > 0 ? '▾' : '•'}</span>
+          <div class="flex-1 min-w-0 space-y-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-sm font-mono ${isSupervisor ? 'text-violet-400' : 'text-gray-200'}">${node.label || node.id || node.pid || 'unknown'}</span>
+              <span class="text-xs ${kindTone}">${node.kind}</span>
+              ${node.restart_strategy && html`<span class="text-xs text-gray-600">${node.restart_strategy}</span>`}
+              ${node.status && html`<span class="text-xs text-gray-600">${node.status}</span>`}
+              ${node.cycle && html`<span class="text-xs text-amber-400">cycle</span>`}
+            </div>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 font-mono">
+              ${node.pid && html`<span>${node.pid}</span>`}
+              ${node.modules && html`<span>${node.modules}</span>`}
+              ${node.message_queue_len != null && html`<span>mq ${node.message_queue_len}</span>`}
+              ${node.current_function && html`<span>${node.current_function}</span>`}
+              ${node.counts && node.counts.active != null && html`<span>${node.counts.active}/${node.counts.specs} active</span>`}
+            </div>
+          </div>
+        </summary>
+
+        ${(node.state_preview || children.length > 0) && html`
+          <div class="px-3 pb-3 space-y-3">
+            ${node.state_preview && html`
+              <div>
+                <div class="text-xs text-gray-600 mb-1">State</div>
+                <pre class="text-xs text-emerald-400 bg-gray-950 p-2 overflow-x-auto whitespace-pre-wrap">${node.state_preview}</pre>
+              </div>
+            `}
+
+            ${children.length > 0 && html`
+              <div class="pl-3 border-l border-gray-800 space-y-3">
+                ${children.map((child, index) => html`<${TopologyNode} key=${index} node=${child} depth=${depth + 1} />`)}
+              </div>
+            `}
+          </div>
+        `}
+      </details>
       `;
     }
 
@@ -1566,7 +1960,7 @@
         const q = filter.toLowerCase();
         return logs.filter(l => {
           const d = l.data || {};
-          return (d.action || '').toLowerCase().includes(q) || (d.source || '').includes(q);
+          return (d.action || '').toLowerCase().includes(q) || (d.source || '').toLowerCase().includes(q);
         });
       }, [logs, filter]);
 
@@ -1584,7 +1978,7 @@
       </div>
       <div class="px-3 py-1.5 border-b border-gray-800 shrink-0">
         <input class="w-full px-2 py-1 bg-gray-950 border border-gray-800 text-xs text-gray-300"
-          placeholder="Filter by action name..." value=${filter} onInput=${e => setFilter(e.target.value)} />
+          placeholder="Filter by action or source..." value=${filter} onInput=${e => setFilter(e.target.value)} />
       </div>
       <div class="flex-1 overflow-y-auto">
         ${filtered.length === 0
@@ -1593,12 +1987,16 @@
             const data = l.data || {};
             const isExpanded = expanded[l.id];
             const hasError = data.response && (data.response.error || data.response.errors);
+            const sourceTone =
+              data.source === 'ws' ? 'text-cyan-400' :
+                data.source === 'mcp' ? 'text-emerald-400' :
+                  data.source === 'elixir' ? 'text-amber-400' : 'text-gray-600';
             return html`
               <div key=${l.id} class="border-b border-gray-800/40 log-new">
                 <div class="log-expand px-3 py-2 flex items-center gap-2" onClick=${() => toggleExpand(l.id)}>
                   <span class="text-xs text-gray-600 w-3">${isExpanded ? '\u25BE' : '\u25B8'}</span>
                   <span class="text-xs font-mono text-violet-400 flex-1 truncate">${data.action || '?'}</span>
-                  <span class="text-xs px-1 ${data.source === 'ws' ? 'text-cyan-400' : 'text-gray-600'}">${data.source || ''}</span>
+                  <span class="text-xs px-1 ${sourceTone}">${data.source || ''}</span>
                   ${hasError && html`<span class="text-xs text-red-400">\u2717</span>`}
                   <span class="text-xs text-gray-600">${data.duration}ms</span>
                 </div>
@@ -1663,35 +2061,56 @@
       const [content, setContent] = useState('');
       const [originalContent, setOriginalContent] = useState('');
       const [loading, setLoading] = useState(true);
+      const [guideLoading, setGuideLoading] = useState(false);
       const [saving, setSaving] = useState(false);
       const [dirty, setDirty] = useState(false);
+      const [viewMode, setViewMode] = useState('preview');
       const editorRef = useRef(null);
       const cmRef = useRef(null);
       const saveRef = useRef(null);
 
       useEffect(() => {
+        let active = true;
+
         api('/api/guides').then(d => {
-          setGuides(d.guides || []);
+          if (!active) return;
+          const items = d.guides || [];
+          setGuides(items);
           setLoading(false);
+          if (items.length > 0 && !selectedFile) {
+            loadGuide(items[0]);
+          }
         });
+
+        return () => {
+          active = false;
+          if (cmRef.current) {
+            cmRef.current = destroyCodeMirror(cmRef.current);
+          }
+        };
       }, []);
 
       async function loadGuide(g) {
         setSelected(g.name);
         setSelectedFile(g.file);
-        setContent('');
+        setGuideLoading(true);
         setDirty(false);
-        if (cmRef.current) { cmRef.current.toTextArea(); cmRef.current = null; }
+        setViewMode('preview');
+        if (cmRef.current) cmRef.current = destroyCodeMirror(cmRef.current);
         const d = await api('/api/guide?name=' + encodeURIComponent(g.file));
         const c = d.content || '';
         setContent(c);
         setOriginalContent(c);
+        setGuideLoading(false);
       }
 
-      // Mount CodeMirror for the edit pane
       useEffect(() => {
+        if (viewMode !== 'edit') {
+          if (cmRef.current) cmRef.current = destroyCodeMirror(cmRef.current);
+          return;
+        }
         if (!selected || !editorRef.current || cmRef.current) return;
-        if (!content && !originalContent) return; // wait for content to load
+
         const cm = CodeMirror(editorRef.current, {
           value: content,
           mode: 'markdown',
@@ -1714,7 +2133,17 @@
         });
         cmRef.current = cm;
         setTimeout(() => cm.refresh(), 1);
-      }, [selected, originalContent]);
+        return () => {
+          if (cmRef.current === cm) cmRef.current = destroyCodeMirror(cm);
+        };
+      }, [selectedFile, viewMode]);
+
+      useEffect(() => {
+        if (viewMode === 'edit' && cmRef.current && cmRef.current.getValue() !== content) {
+          cmRef.current.setValue(content);
+          setTimeout(() => cmRef.current && cmRef.current.refresh(), 1);
+        }
+      }, [content, viewMode, selectedFile]);
 
       async function saveGuide() {
         if (!selectedFile) return;
@@ -1728,59 +2157,65 @@
       }
       saveRef.current = saveGuide;
 
-      function goBack() {
-        setSelected(null);
-        setSelectedFile(null);
-        setContent('');
-        setOriginalContent('');
-        setDirty(false);
-        if (cmRef.current) { cmRef.current.toTextArea(); cmRef.current = null; }
-      }
-
       if (loading) return html`<div class="p-8"> <span class="spinner"></span></div> `;
 
-      if (!selected) {
-        return html`
-      <div class="h-full flex flex-col">
+      return html`
+      <div class="h-full flex min-h-0">
+        <div class="w-72 border-r border-gray-800 bg-gray-900/50 shrink-0 flex flex-col">
           <${SectionHeader} title="Guides" count=${guides.length} />
           <div class="flex-1 overflow-y-auto">
             ${guides.length === 0
-            ? html`<div class="p-5 text-sm text-gray-600">No guides found. Add <code>.md</code> files to your project's <code>guides/</code> directory.</div>`
-            : guides.map(g => html`
-                <div class="flex items-center gap-3 px-5 py-3 hover:bg-gray-800/40 cursor-pointer transition-colors border-b border-gray-800/30"
+          ? html`<div class="p-5 text-sm text-gray-600">No guides found. Add <code>.md</code> files to your project's <code>guides/</code> directory.</div>`
+          : guides.map(g => html`
+                <button key=${g.file}
+                  class="group w-full text-left px-4 py-3 bg-transparent border-x-0 border-t-0 border-b border-gray-800/30 cursor-pointer transition-colors
+                    ${selectedFile === g.file ? 'bg-violet-500/10' : 'hover:bg-gray-800/40'}"
                   onClick=${() => loadGuide(g)}>
-                  <span class="text-lg">\uD83D\uDCD6</span>
-                  <div>
-                    <div class="text-sm text-gray-200">${g.name}</div>
-                    <div class="text-xs text-gray-600">${g.file}</div>
+                  <div class="flex items-start gap-3">
+                    <span class="text-base ${selectedFile === g.file ? 'text-violet-400' : 'text-gray-500 group-hover:text-gray-300'}">\uD83D\uDCD6</span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-sm ${selectedFile === g.file ? 'text-violet-300' : 'text-gray-200'} truncate">${g.name}</div>
+                      <div class="text-xs text-gray-600 truncate">${g.file}</div>
+                    </div>
+                    <span class="text-[10px] uppercase tracking-wider text-gray-700 group-hover:text-gray-500">Open</span>
                   </div>
-                </div>
+                </button>
               `)
-          }
+        }
           </div>
         </div>
-      `;
-      }
 
-      return html`
-      <div class="h-full flex flex-col">
-        <div class="px-4 py-2 border-b border-gray-800 flex items-center gap-2 bg-gray-900/50 shrink-0">
-          <button class="text-gray-500 hover:text-gray-300 bg-transparent border-none cursor-pointer text-sm"
-            onClick=${goBack}>\u2190</button>
-          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex-1 truncate">${selected}</span>
-          ${dirty && html`<span class="text-xs text-amber-400">\u25CF</span>`}
-          <button class="px-2.5 py-1 text-xs rounded border-none cursor-pointer transition-colors
-            ${dirty ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-gray-800 text-gray-600 cursor-default'}"
-            onClick=${saveGuide} disabled=${!dirty || saving}>
-            ${saving ? html`<span class="spinner mr-1" style="width:10px;height:10px;border-width:1.5px"></span>` : ''} Save
-          </button>
-        </div>
-        <div class="flex flex-1 min-h-0">
-          <!-- Edit pane -->
-          <div class="cm-wrap flex-1 min-w-0 border-r border-gray-800" ref=${editorRef}></div>
-          <!-- Run pane -->
-          <div class="flex-1 min-w-0 overflow-y-auto">
-            ${content ? html`<${MarkdownRenderer} content=${content} />` : html`<div class="p-5"><span class="spinner"></span></div>`}
+        <div class="flex-1 min-w-0 flex flex-col">
+          <div class="px-4 py-3 border-b border-gray-800 flex items-center gap-3 bg-gray-900/50 shrink-0">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">${selected || 'Guides'}</div>
+              ${selectedFile && html`<div class="text-xs text-gray-600 truncate mt-0.5">${selectedFile}</div>`}
+            </div>
+            <div class="flex items-center gap-1 rounded-lg bg-gray-900 border border-gray-800 p-1">
+              <button class="px-2.5 py-1 text-xs rounded border-none cursor-pointer transition-colors ${viewMode === 'preview' ? 'bg-violet-600 text-white' : 'bg-transparent text-gray-500 hover:text-gray-300'}"
+                onClick=${() => setViewMode('preview')}>Preview</button>
+              <button class="px-2.5 py-1 text-xs rounded border-none cursor-pointer transition-colors ${viewMode === 'edit' ? 'bg-violet-600 text-white' : 'bg-transparent text-gray-500 hover:text-gray-300'}"
+                onClick=${() => setViewMode('edit')}>Edit</button>
+            </div>
+            ${dirty && html`<span class="text-xs text-amber-400">\u25CF</span>`}
+            <button class="px-2.5 py-1 text-xs rounded border-none cursor-pointer transition-colors
+              ${dirty ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-gray-800 text-gray-600 cursor-default'}"
+              onClick=${saveGuide} disabled=${!dirty || saving}>
+              ${saving ? html`<span class="spinner mr-1" style="width:10px;height:10px;border-width:1.5px"></span>` : ''} Save
+            </button>
+          </div>
+
+          <div class="flex-1 min-h-0 overflow-hidden">
+            ${guideLoading
+          ? html`<div class="p-5"><span class="spinner"></span></div>`
+          : viewMode === 'edit'
+            ? html`<div class="cm-wrap h-full" ref=${editorRef}></div>`
+            : html`
+                  <div class="h-full overflow-y-auto">
+                    ${content ? html`<${MarkdownRenderer} content=${content} />` : html`<div class="p-5 text-sm text-gray-600">Select a guide to preview it.</div>`}
+                  </div>
+                `
+        }
           </div>
         </div>
       </div>
@@ -1873,6 +2308,8 @@
       editedRef.current = editedCode;
 
       const isEval = ['elixir', 'ex', 'exs', 'iex'].includes(lang) || lang === '';
+      const lineCount = editedCode.split('\n').length;
+      const largeBlock = lineCount > 24 || editedCode.length > 1200;
 
       const modeMap = {
         elixir: 'ruby', ex: 'ruby', exs: 'ruby', iex: 'ruby', erl: 'erlang',
@@ -1883,7 +2320,6 @@
 
       useEffect(() => {
         if (!editorRef.current || cmRef.current) return;
-        const lineCount = code.split('\n').length;
         const cm = CodeMirror(editorRef.current, {
           value: code,
           mode: modeMap[lang] || null,
@@ -1914,7 +2350,7 @@
       }
 
       return html`
-      <div class="border border-gray-800 overflow-hidden group/eval relative">
+      <div class="border border-gray-800 overflow-hidden group/eval relative ${loading ? 'eval-running' : ''}">
         <div class="cm-wrap-block" ref=${editorRef}></div>
         ${isEval && html`
           <button class="eval-run-btn absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded

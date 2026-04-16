@@ -178,6 +178,104 @@ defmodule Mooncore.Dev.Plug do
     |> send_resp(200, Jason.encode!(%{apps: Mooncore.MCP.Server.list_apps()}))
   end
 
+  post "/api/ets/insert" do
+    table_id = conn.body_params["table"]
+    term_str = conn.body_params["term"] || ""
+
+    result =
+      try do
+        tab = decode_ets_table_id(table_id)
+
+        {term, _bindings} = Code.eval_string(term_str)
+        :ets.insert(tab, term)
+        %{ok: true}
+      rescue
+        e -> %{ok: false, error: Exception.message(e)}
+      end
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(result))
+  end
+
+  post "/api/ets/delete" do
+    table_id = conn.body_params["table"]
+    key_str = conn.body_params["key"] || ""
+
+    result =
+      try do
+        tab = decode_ets_table_id(table_id)
+
+        {key, _bindings} = Code.eval_string(key_str)
+        :ets.delete(tab, key)
+        %{ok: true}
+      rescue
+        e -> %{ok: false, error: Exception.message(e)}
+      end
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(result))
+  end
+
+  get "/api/ets/rows" do
+    table_id = conn.query_params["table"]
+    filter = String.trim(conn.query_params["filter"] || "")
+
+    page =
+      conn.query_params["page"]
+      |> Kernel.||("1")
+      |> String.to_integer()
+      |> max(1)
+
+    limit =
+      conn.query_params["limit"]
+      |> Kernel.||("50")
+      |> String.to_integer()
+      |> min(200)
+      |> max(1)
+
+    result =
+      try do
+        tab = decode_ets_table_id(table_id)
+
+        case :ets.info(tab) do
+          :undefined ->
+            %{ok: false, error: "Table no longer exists"}
+
+          info ->
+            protection = info[:protection]
+
+            if protection == :private do
+              %{ok: false, error: "Table is private and cannot be inspected from devtools"}
+            else
+              {rows, total_matching} = fetch_ets_rows(tab, filter, page, limit)
+              total_pages = max(div(max(total_matching - 1, 0), limit) + 1, 1)
+
+              %{
+                ok: true,
+                rows: rows,
+                protection: to_string(protection),
+                filter: filter,
+                page: page,
+                limit: limit,
+                total_matching: total_matching,
+                total_pages: total_pages,
+                has_prev: page > 1,
+                has_next: page < total_pages
+              }
+            end
+        end
+      rescue
+        _ ->
+          %{ok: false, error: "Table could not be inspected"}
+      end
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(result))
+  end
+
   # ── Dashboard API ──
 
   get "/api/dashboard" do
@@ -291,10 +389,11 @@ defmodule Mooncore.Dev.Plug do
 
           %{
             name: inspect(:ets.info(tab, :name)),
-            id: inspect(tab),
+            id: encode_ets_table_id(tab),
             size: :ets.info(tab, :size),
             memory: :ets.info(tab, :memory) * ws,
-            type: to_string(:ets.info(tab, :type))
+            type: to_string(:ets.info(tab, :type)),
+            protection: to_string(:ets.info(tab, :protection))
           }
         rescue
           _ -> nil
@@ -311,6 +410,8 @@ defmodule Mooncore.Dev.Plug do
       end)
       |> Enum.sort_by(& &1.name)
 
+    topology = supervisor_topology_snapshot()
+
     data = %{
       memory: memory,
       schedulers: sched,
@@ -318,6 +419,7 @@ defmodule Mooncore.Dev.Plug do
       top_processes: top_procs,
       ets_tables: ets_tables,
       applications: apps,
+      topology: topology,
       timestamp: System.system_time(:millisecond)
     }
 
@@ -515,5 +617,436 @@ defmodule Mooncore.Dev.Plug do
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(status, Jason.encode!(%{error: message}))
+  end
+
+  defp supervisor_topology_snapshot do
+    supervisors = registered_supervisors()
+
+    child_supervisor_pids =
+      supervisors
+      |> Enum.flat_map(fn {_name, pid} -> direct_child_supervisor_pids(pid) end)
+      |> MapSet.new()
+
+    roots =
+      supervisors
+      |> Enum.reject(fn {_name, pid} -> MapSet.member?(child_supervisor_pids, pid) end)
+      |> Enum.map(fn {name, pid} -> build_supervisor_node(pid, name, MapSet.new()) end)
+
+    if roots == [] and supervisors != [] do
+      %{
+        roots:
+          Enum.map(supervisors, fn {name, pid} ->
+            build_supervisor_node(pid, name, MapSet.new())
+          end),
+        registered_processes: length(Process.registered()),
+        supervisor_count: length(supervisors),
+        root_count: length(supervisors)
+      }
+    else
+      %{
+        roots: roots,
+        registered_processes: length(Process.registered()),
+        supervisor_count: length(supervisors),
+        root_count: length(roots)
+      }
+    end
+  end
+
+  defp registered_supervisors do
+    Process.registered()
+    |> Enum.map(fn name -> {name, Process.whereis(name)} end)
+    |> Enum.filter(fn {_name, pid} -> is_pid(pid) end)
+    |> Enum.filter(fn {_name, pid} -> otp_module(pid) == :supervisor end)
+  end
+
+  defp direct_child_supervisor_pids(pid) do
+    pid
+    |> safe_which_children()
+    |> Enum.flat_map(fn {_id, child_pid, type, _modules} ->
+      if type == :supervisor and is_pid(child_pid), do: [child_pid], else: []
+    end)
+  end
+
+  defp build_supervisor_node(pid, registered_name, visited) do
+    pid_key = inspect(pid)
+
+    if MapSet.member?(visited, pid_key) do
+      %{
+        id: registered_name && inspect(registered_name),
+        label: node_label(registered_name, pid),
+        pid: pid_key,
+        kind: "supervisor",
+        cycle: true,
+        children: []
+      }
+    else
+      next_visited = MapSet.put(visited, pid_key)
+      counts = safe_count_children(pid)
+
+      children =
+        pid
+        |> safe_which_children()
+        |> Enum.map(fn {id, child_pid, type, modules} ->
+          build_child_node(id, child_pid, type, modules, next_visited)
+        end)
+
+      %{
+        id: registered_name && inspect(registered_name),
+        label: node_label(registered_name, pid),
+        pid: pid_key,
+        kind: "supervisor",
+        restart_strategy: safe_supervisor_strategy(pid),
+        counts: counts,
+        children: children
+      }
+    end
+  end
+
+  defp build_child_node(id, child_pid, type, modules, visited) do
+    cond do
+      type == :supervisor and is_pid(child_pid) ->
+        build_supervisor_node(child_pid, registered_name(child_pid) || id, visited)
+
+      is_pid(child_pid) ->
+        worker_node(id, child_pid, modules)
+
+      child_pid == :restarting ->
+        %{
+          id: inspect(id),
+          label: inspect(id),
+          pid: "restarting",
+          kind: worker_kind_from_modules(modules),
+          modules: format_modules(modules),
+          status: "restarting"
+        }
+
+      true ->
+        %{
+          id: inspect(id),
+          label: inspect(id),
+          pid: nil,
+          kind: worker_kind_from_modules(modules),
+          modules: format_modules(modules),
+          status: "not_started"
+        }
+    end
+  end
+
+  defp worker_node(id, pid, modules) do
+    %{
+      id: inspect(id),
+      label: node_label(registered_name(pid) || id, pid),
+      pid: inspect(pid),
+      kind: worker_kind(pid, modules),
+      modules: format_modules(modules),
+      status: process_status(pid),
+      message_queue_len: process_message_queue_len(pid),
+      current_function: process_current_function(pid),
+      state_preview: safe_state_preview(pid)
+    }
+  end
+
+  defp node_label(nil, pid), do: inspect(pid)
+  defp node_label(name, _pid), do: inspect(name)
+
+  defp registered_name(pid) do
+    case Process.info(pid, :registered_name) do
+      {:registered_name, []} -> nil
+      {:registered_name, name} -> name
+      _ -> nil
+    end
+  end
+
+  defp otp_module(pid) do
+    case safe_sys_status(pid) do
+      {:status, ^pid, {:module, module}, _} -> module
+      _ -> nil
+    end
+  end
+
+  defp worker_kind(pid, modules) do
+    case otp_module(pid) do
+      :gen_server -> "gen_server"
+      :gen_statem -> "gen_statem"
+      :gen_event -> "gen_event"
+      :supervisor -> "supervisor"
+      _ -> worker_kind_from_modules(modules)
+    end
+  end
+
+  defp worker_kind_from_modules(modules) do
+    case modules do
+      [:supervisor] -> "supervisor"
+      [module] when is_atom(module) -> inspect(module)
+      _ -> "worker"
+    end
+  end
+
+  defp format_modules(:dynamic), do: "dynamic"
+  defp format_modules(modules) when is_list(modules), do: Enum.map_join(modules, ", ", &inspect/1)
+  defp format_modules(_), do: nil
+
+  defp safe_which_children(pid) do
+    Supervisor.which_children(pid)
+  catch
+    :exit, _ -> []
+  end
+
+  defp safe_count_children(pid) do
+    pid
+    |> Supervisor.count_children()
+    |> Enum.into(%{}, fn {key, value} -> {to_string(key), value} end)
+  catch
+    :exit, _ -> %{}
+  end
+
+  defp safe_supervisor_strategy(pid) do
+    case safe_sys_status(pid) do
+      {:status, ^pid, {:module, :supervisor}, [_pdict, _sys_state, _parent, _debug, misc]} ->
+        misc
+        |> extract_supervisor_flags()
+        |> Map.get(:strategy)
+        |> case do
+          nil -> nil
+          strategy -> to_string(strategy)
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp extract_supervisor_flags({flags, _children}) when is_map(flags), do: flags
+
+  defp extract_supervisor_flags({{strategy, intensity, period}, _children}),
+    do: %{strategy: strategy, intensity: intensity, period: period}
+
+  defp extract_supervisor_flags(_), do: %{}
+
+  defp safe_sys_status(pid) do
+    if otp_behavior?(pid) do
+      try do
+        :sys.get_status(pid, 50)
+      catch
+        :exit, _ -> nil
+      end
+    end
+  end
+
+  defp otp_behavior?(pid) do
+    case Process.info(pid, :dictionary) do
+      {:dictionary, dict} ->
+        case List.keyfind(dict, :"$initial_call", 0) do
+          {_, {:supervisor, _, _}} ->
+            true
+
+          {_, {:gen_server, _, _}} ->
+            true
+
+          {_, {:gen_statem, _, _}} ->
+            true
+
+          {_, {:gen_event, _, _}} ->
+            true
+
+          {_, {mod, _, _}} ->
+            mod_str = Atom.to_string(mod)
+
+            String.contains?(mod_str, "GenServer") or
+              String.contains?(mod_str, "Supervisor") or
+              String.contains?(mod_str, "GenStatem") or
+              String.contains?(mod_str, "GenEvent")
+
+          _ ->
+            false
+        end
+
+      _ ->
+        false
+    end
+  end
+
+  defp safe_state_preview(pid) do
+    case otp_module(pid) do
+      module when module in [:gen_server, :gen_statem, :gen_event] ->
+        try do
+          pid
+          |> :sys.get_state(50)
+          |> inspect(pretty: true, limit: 8, printable_limit: 400)
+        catch
+          :exit, _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp process_status(pid) do
+    case Process.info(pid, :status) do
+      {:status, status} -> to_string(status)
+      _ -> nil
+    end
+  end
+
+  defp process_message_queue_len(pid) do
+    case Process.info(pid, :message_queue_len) do
+      {:message_queue_len, len} -> len
+      _ -> 0
+    end
+  end
+
+  defp fetch_ets_rows(tab, filter, page, limit) do
+    offset = (page - 1) * limit
+    normalized_filter = String.downcase(filter)
+
+    :ets.safe_fixtable(tab, true)
+
+    try do
+      tab
+      |> :ets.first()
+      |> scan_ets_rows(tab, normalized_filter, offset, limit, 0, [])
+    after
+      :ets.safe_fixtable(tab, false)
+    end
+  end
+
+  defp scan_ets_rows(:"$end_of_table", _tab, _filter, _offset, _limit, total_matching, acc) do
+    {Enum.reverse(acc), total_matching}
+  end
+
+  defp scan_ets_rows(key, tab, filter, offset, limit, total_matching, acc) do
+    objects = :ets.lookup(tab, key)
+
+    {next_total, next_acc} =
+      Enum.reduce(objects, {total_matching, acc}, fn row, {count, rows} ->
+        row_text = inspect(row, pretty: false, limit: 20, printable_limit: 2_000)
+
+        if filter == "" or String.contains?(String.downcase(row_text), filter) do
+          next_count = count + 1
+
+          cond do
+            next_count <= offset ->
+              {next_count, rows}
+
+            length(rows) >= limit ->
+              {next_count, rows}
+
+            true ->
+              built_row = %{
+                index: next_count,
+                preview: inspect(row, pretty: true, limit: 6, printable_limit: 220),
+                term: serialize_term(row),
+                bytes: :erts_debug.flat_size(row) * :erlang.system_info(:wordsize)
+              }
+
+              {next_count, [built_row | rows]}
+          end
+        else
+          {count, rows}
+        end
+      end)
+
+    scan_ets_rows(:ets.next(tab, key), tab, filter, offset, limit, next_total, next_acc)
+  end
+
+  defp serialize_term(term, depth \\ 0)
+
+  defp serialize_term(term, depth) when depth >= 4 do
+    %{kind: "inspect", value: inspect(term, pretty: true, limit: 6, printable_limit: 240)}
+  end
+
+  defp serialize_term(term, _depth) when is_nil(term) or is_boolean(term) or is_number(term) do
+    %{kind: "scalar", value: term}
+  end
+
+  defp serialize_term(term, _depth) when is_binary(term) do
+    %{
+      kind: "binary",
+      value: binary_preview(term),
+      length: byte_size(term),
+      utf8: String.valid?(term)
+    }
+  end
+
+  defp serialize_term(term, _depth) when is_atom(term) do
+    %{kind: "atom", value: inspect(term)}
+  end
+
+  defp serialize_term(term, _depth)
+       when is_pid(term) or is_port(term) or is_reference(term) or is_function(term) do
+    %{kind: "inspect", value: inspect(term)}
+  end
+
+  defp serialize_term(term, depth) when is_tuple(term) do
+    items = term |> Tuple.to_list() |> Enum.take(25) |> Enum.map(&serialize_term(&1, depth + 1))
+
+    %{
+      kind: "tuple",
+      size: tuple_size(term),
+      truncated: tuple_size(term) > 25,
+      items: items
+    }
+  end
+
+  defp serialize_term(term, depth) when is_list(term) do
+    items = term |> Enum.take(25) |> Enum.map(&serialize_term(&1, depth + 1))
+
+    %{
+      kind: "list",
+      size: length(term),
+      truncated: length(term) > 25,
+      items: items
+    }
+  end
+
+  defp serialize_term(term, depth) when is_map(term) do
+    entries =
+      term
+      |> Enum.take(25)
+      |> Enum.map(fn {key, value} ->
+        %{
+          key: serialize_term(key, depth + 1),
+          value: serialize_term(value, depth + 1)
+        }
+      end)
+
+    %{
+      kind: "map",
+      size: map_size(term),
+      truncated: map_size(term) > 25,
+      entries: entries
+    }
+  end
+
+  defp serialize_term(term, _depth) do
+    %{kind: "inspect", value: inspect(term, pretty: true, limit: 6, printable_limit: 240)}
+  end
+
+  defp binary_preview(term) do
+    if String.valid?(term) do
+      String.slice(term, 0, 1_000)
+    else
+      inspect(term, pretty: true, limit: 6, printable_limit: 240)
+    end
+  end
+
+  defp encode_ets_table_id(tab) do
+    tab
+    |> :erlang.term_to_binary()
+    |> Base.url_encode64(padding: false)
+  end
+
+  defp decode_ets_table_id(encoded) when is_binary(encoded) do
+    encoded
+    |> Base.url_decode64!(padding: false)
+    |> :erlang.binary_to_term()
+  end
+
+  defp process_current_function(pid) do
+    case Process.info(pid, :current_function) do
+      {:current_function, {mod, fun, arity}} -> "#{inspect(mod)}.#{fun}/#{arity}"
+      _ -> nil
+    end
   end
 end

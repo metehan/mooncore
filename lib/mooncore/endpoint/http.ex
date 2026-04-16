@@ -59,7 +59,9 @@ defmodule Mooncore.Endpoint.Http do
         conn.params["action"],
         %{
           auth: conn.assigns[:auth] || Map.get(conn, :auth, nil),
-          params: conn.params
+          params: conn.params,
+          source: "http",
+          ip: remote_ip_to_string(conn.remote_ip)
         }
       )
     rescue
@@ -69,4 +71,15 @@ defmodule Mooncore.Endpoint.Http do
         %{error: "Internal Server Error"}
     end
   end
+
+  defp remote_ip_to_string({a, b, c, d}), do: Enum.join([a, b, c, d], ".")
+
+  defp remote_ip_to_string({a, b, c, d, e, f, g, h}) do
+    [a, b, c, d, e, f, g, h]
+    |> Enum.map(&Integer.to_string(&1, 16))
+    |> Enum.join(":")
+  end
+
+  defp remote_ip_to_string(ip) when is_list(ip), do: to_string(ip)
+  defp remote_ip_to_string(_), do: nil
 end

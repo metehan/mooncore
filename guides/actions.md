@@ -31,12 +31,12 @@ end
 "action.name" => {HandlerModule, :function, required_roles, request_modifications}
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `HandlerModule` | module | The module containing the handler function |
-| `:function` | atom | The function name to call |
-| `required_roles` | list | Role strings. `[]` = public (no auth needed) |
-| `request_modifications` | map | Merged into request before calling handler |
+| Field                   | Type   | Description                                  |
+| ----------------------- | ------ | -------------------------------------------- |
+| `HandlerModule`         | module | The module containing the handler function   |
+| `:function`             | atom   | The function name to call                    |
+| `required_roles`        | list   | Role strings. `[]` = public (no auth needed) |
+| `request_modifications` | map    | Merged into request before calling handler   |
 
 ### Request Modifications
 

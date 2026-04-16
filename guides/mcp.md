@@ -14,7 +14,7 @@ config :mooncore,
   mcp_port: 4040   # default
 ```
 
-Also set `MOONCORE_DEV_MODE=true` environment variable on your system. 
+Also set `MOONCORE_DEV_TOOLS=true` environment variable on your system. 
 
 The MCP endpoint is available at `http://localhost:4040/mcp` when the server is running.
 

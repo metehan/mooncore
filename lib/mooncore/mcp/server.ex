@@ -91,7 +91,7 @@ defmodule Mooncore.MCP.Server do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
     %{
-      port: Mooncore.config(:port, 4444),
+      port: Mooncore.config(:port, 4000),
       pools: Mooncore.config(:pools, [:default]),
       router: inspect(Mooncore.config(:router)),
       app_module: inspect(Mooncore.config(:app_module)),
@@ -119,7 +119,8 @@ defmodule Mooncore.MCP.Server do
     else
       request = %{
         params: Map.put(params, "action", action),
-        auth: auth
+        auth: auth,
+        source: "mcp"
       }
 
       try do

@@ -43,7 +43,7 @@ defmodule MyApp.MixProject do
   def project do
     [
       app: :my_app,
-      version: "0.1.0",
+      version: "0.2.0",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps()
@@ -203,6 +203,8 @@ Each guide should explain:
 - a short test or verification flow so the developer can see it working
 
 Split guides by domain so each action group has its own file, such as `guides/users.md` or `guides/billing.md`.
+
+Keep each code block short and independently runnable. Large multi-step snippets are harder to execute and debug safely in the Dev Tools inline runner.
 
 ## How Actions Work
 
