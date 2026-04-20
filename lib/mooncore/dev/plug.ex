@@ -49,7 +49,21 @@ defmodule Mooncore.Dev.Plug do
     body = conn.body_params
 
     case body do
-      # Batch request (array)
+      # Batch request (array) — Plug stores top-level JSON arrays as %{"_json" => [...]}
+      %{"_json" => requests} when is_list(requests) ->
+        responses =
+          requests
+          |> Enum.map(&Mooncore.MCP.Protocol.handle/1)
+          |> Enum.reject(&(&1 == :notification))
+
+        if responses == [] do
+          send_resp(conn, 202, "")
+        else
+          conn
+          |> put_resp_content_type("application/json")
+          |> send_resp(200, Jason.encode!(responses))
+        end
+
       requests when is_list(requests) ->
         responses =
           requests

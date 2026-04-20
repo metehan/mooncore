@@ -244,20 +244,6 @@ defmodule Mooncore.Endpoint.Socket.Handler do
     {:reply, :ok, {:text, content}, state}
   end
 
-  ## Cleanup on disconnect
-
-  def terminate(_reason, state) do
-    if state.anon do
-      Clients.remove_member(@anon_group, [@anon_channel], self())
-    else
-      if state.auth do
-        Clients.remove_member(state.auth["dkey"], state.listening, self())
-      end
-    end
-
-    :ok
-  end
-
   ## Channel management via process messages
 
   def handle_info({:listen, group, channel}, state) do
@@ -278,5 +264,19 @@ defmodule Mooncore.Endpoint.Socket.Handler do
       Map.merge(state, %{listening: Enum.reject(state.listening, fn ch -> ch == channel end)})
 
     reply("channel_list", state.listening, state)
+  end
+
+  ## Cleanup on disconnect
+
+  def terminate(_reason, state) do
+    if state.anon do
+      Clients.remove_member(@anon_group, [@anon_channel], self())
+    else
+      if state.auth do
+        Clients.remove_member(state.auth["dkey"], state.listening, self())
+      end
+    end
+
+    :ok
   end
 end

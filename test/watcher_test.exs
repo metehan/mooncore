@@ -1,17 +1,24 @@
 defmodule Mooncore.MCP.WatcherTest do
   use ExUnit.Case
 
+  if System.get_env("MOONCORE_DEV_TOOLS") != "true" do
+    IO.puts("\n  [skip] Mooncore.MCP.WatcherTest — run with: MOONCORE_DEV_TOOLS=true mix test")
+  end
+
   @moduletag skip:
                if(System.get_env("MOONCORE_DEV_TOOLS") == "true",
                  do: false,
-                 else:
-                   "MOONCORE_DEV_TOOLS=true not set — run with: MOONCORE_DEV_TOOLS=true mix test"
+                 else: "MOONCORE_DEV_TOOLS=true not set"
                )
 
   setup do
     start_supervised!(Mooncore.MCP.Watcher)
     Application.put_env(:mooncore, :mooncore_dev_tools, true)
-    on_exit(fn -> Application.delete_env(:mooncore, :mooncore_dev_tools) end)
+
+    on_exit(fn ->
+      Application.delete_env(:mooncore, :mooncore_dev_tools)
+    end)
+
     :ok
   end
 
