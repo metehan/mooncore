@@ -435,31 +435,65 @@ defmodule Mooncore.Dev.Plug do
 
     data =
       try do
-        state = Clients.list_all()
+        pools = Mooncore.config(:pools, [:default])
 
         groups =
-          Enum.map(state, fn {group, channels} ->
-            channel_list =
-              Enum.map(channels, fn {channel, pids} ->
-                %{
-                  channel: channel,
-                  members: Enum.map(pids, &inspect/1),
-                  count: length(pids)
-                }
-              end)
-              |> Enum.sort_by(& &1.channel)
+          Enum.flat_map(pools, fn pool ->
+            Clients.list_all(pool)
+            |> Enum.map(fn {group, channels} ->
+              channel_list =
+                Enum.map(channels, fn {channel, pids} ->
+                  %{
+                    channel: channel,
+                    members: Enum.map(pids, &inspect/1),
+                    count: length(pids)
+                  }
+                end)
+                |> Enum.sort_by(& &1.channel)
 
-            %{
-              group: group,
-              channels: channel_list,
-              total: Enum.reduce(channel_list, 0, fn c, acc -> acc + c.count end)
-            }
+              %{
+                pool: pool,
+                group: group,
+                channels: channel_list,
+                total: Enum.reduce(channel_list, 0, fn c, acc -> acc + c.count end)
+              }
+            end)
           end)
-          |> Enum.sort_by(& &1.group)
+          |> Enum.sort_by(&{&1.group, &1.pool})
 
         %{groups: groups}
       rescue
         _ -> %{groups: [], error: "Clients GenServer not running"}
+      end
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(data))
+  end
+
+  # ── Socket Logs API ──
+
+  get "/api/socket-logs" do
+    conn = fetch_query_params(conn)
+    qp = conn.query_params
+
+    opts =
+      %{
+        "limit" => qp["limit"] && String.to_integer(qp["limit"]),
+        "user" => qp["user"],
+        "channel" => qp["channel"],
+        "direction" => qp["direction"],
+        "since_id" => qp["since_id"] && String.to_integer(qp["since_id"])
+      }
+      |> Enum.reject(fn {_, v} -> is_nil(v) end)
+      |> Map.new()
+
+    data =
+      try do
+        logs = Mooncore.MCP.Server.read_socket_logs(opts)
+        %{logs: logs}
+      rescue
+        _ -> %{logs: [], error: "Could not read socket logs"}
       end
 
     conn

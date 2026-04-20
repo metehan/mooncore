@@ -22,9 +22,20 @@ defmodule Mooncore.Endpoint.Socket do
   def publish(group, {name, message}, channels \\ ["main:default"]) do
     message = if is_map(message), do: Map.delete(message, "password"), else: message
 
+    if Mooncore.mooncore_dev_tools_enabled?() do
+      Mooncore.MCP.Watcher.log(:socket, %{
+        direction: :publish,
+        pid: nil,
+        user: nil,
+        dkey: group,
+        channels: channels,
+        payload: [name, message]
+      })
+    end
+
     for channel <- channels do
       Clients.list_members(group, channel)
-      |> Enum.each(fn pid -> send(pid, {:push, [name, message]}) end)
+      |> Manifold.send({:push, [name, message]})
     end
 
     message

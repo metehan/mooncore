@@ -27,6 +27,9 @@ defmodule Mooncore.Endpoint.Socket.Handler do
   alias Mooncore.Endpoint.Socket.Clients
   alias Mooncore.Endpoint.Socket
 
+  @anon_group "_anon"
+  @anon_channel "ws:pending"
+
   ## Init
 
   def init(conn: conn) do
@@ -34,10 +37,13 @@ defmodule Mooncore.Endpoint.Socket.Handler do
 
     listening =
       if auth do
+        # Only subscribe to the personal channel automatically.
+        # The scope channel (main:{scope}) must be joined explicitly
+        # to avoid putting all clients in one massive channel.
         Clients.add_member(auth["dkey"], "@#{auth["user"]}", self())
-        Clients.add_member(auth["dkey"], "main:#{auth["scope"]}", self())
-        ["@#{auth["user"]}", "main:#{auth["scope"]}"]
+        ["@#{auth["user"]}"]
       else
+        Clients.add_member(@anon_group, @anon_channel, self())
         []
       end
 
@@ -46,7 +52,8 @@ defmodule Mooncore.Endpoint.Socket.Handler do
        conn: conn,
        auth: auth,
        pid: self(),
-       listening: listening
+       listening: listening,
+       anon: is_nil(auth)
      }}
   end
 
@@ -60,21 +67,38 @@ defmodule Mooncore.Endpoint.Socket.Handler do
     {:reply, :ok, {:text, Jason.encode!([name, msg])}, state}
   end
 
+  defp log_socket(direction, state, payload) do
+    if Mooncore.mooncore_dev_tools_enabled?() do
+      Mooncore.MCP.Watcher.log(:socket, %{
+        direction: direction,
+        pid: inspect(self()),
+        user: state.auth && state.auth["user"],
+        dkey: state.auth && state.auth["dkey"],
+        channels: state.listening,
+        payload: payload
+      })
+    end
+  end
+
   ## Text Messages
 
   def handle_in({"ping", [opcode: :text]}, state) do
+    log_socket(:in, state, "ping")
     reply("pong", state)
   end
 
   def handle_in({"time", [opcode: :text]}, state) do
+    log_socket(:in, state, "time")
     reply("server_time", :os.system_time(:milli_seconds), state)
   end
 
   def handle_in({"channel_list", [opcode: :text]}, state) do
+    log_socket(:in, state, "channel_list")
     reply("channel_list", state.listening, state)
   end
 
   def handle_in({"quit", [opcode: :text]}, state) do
+    log_socket(:in, state, "quit")
     {:stop, :normal, state}
   end
 
@@ -107,16 +131,27 @@ defmodule Mooncore.Endpoint.Socket.Handler do
 
   # JWT authentication
   def handle_map(["jwt", jwt], state) do
+    log_socket(:in, state, ["jwt", "<redacted>"])
+
     case Mooncore.Auth.Token.solve(jwt) do
       {:ok, auth} ->
-        Clients.add_member(auth["dkey"], "@#{auth["user"]}", self())
-        Clients.add_member(auth["dkey"], "main:#{auth["scope"]}", self())
+        # Remove from anon bucket if this was an unauthenticated connection
+        if state.anon do
+          Clients.remove_member(@anon_group, [@anon_channel], self())
+        end
 
-        state =
-          Map.merge(state, %{
-            auth: auth,
-            listening: Enum.uniq(state.listening ++ ["@#{auth["user"]}", "main:#{auth["scope"]}"])
-          })
+        # Only auto-subscribe to personal channel.
+        # Scope channel (main:{scope}) requires explicit ["join", "main"].
+        Clients.add_member(auth["dkey"], "@#{auth["user"]}", self())
+        personal = "@#{auth["user"]}"
+
+        listening =
+          if(personal in state.listening,
+            do: state.listening,
+            else: [personal | state.listening]
+          )
+
+        state = Map.merge(state, %{auth: auth, anon: false, listening: listening})
 
         reply("jwt", auth, state)
 
@@ -127,12 +162,24 @@ defmodule Mooncore.Endpoint.Socket.Handler do
 
   # Channel join
   def handle_map(["join", channel], state) do
+    log_socket(:in, state, ["join", channel])
     roles = (state.auth && state.auth["roles"]) || []
 
-    if Enum.member?(roles, "channel_#{channel}") do
+    # "main" is the scope channel — allowed if authenticated
+    # Custom channels require role "channel_{name}"
+    allowed =
+      state.auth &&
+        (channel == "main" or Enum.member?(roles, "channel_#{channel}"))
+
+    if allowed do
       scoped_channel = "#{channel}:#{state.auth["scope"]}"
       Clients.add_member(state.auth["dkey"], scoped_channel, self())
-      state = Map.merge(state, %{listening: Enum.uniq(state.listening ++ [scoped_channel])})
+
+      state =
+        if scoped_channel in state.listening,
+          do: state,
+          else: %{state | listening: [scoped_channel | state.listening]}
+
       reply("channel_list", state.listening, state)
     else
       reply("channel_list", state.listening, state)
@@ -141,6 +188,8 @@ defmodule Mooncore.Endpoint.Socket.Handler do
 
   # Channel leave
   def handle_map(["leave", channel], state) do
+    log_socket(:in, state, ["leave", channel])
+
     if state.auth do
       scoped_channel = "#{channel}:#{state.auth["scope"]}"
       Clients.remove_member(state.auth["dkey"], [scoped_channel], self())
@@ -158,6 +207,7 @@ defmodule Mooncore.Endpoint.Socket.Handler do
 
   # Forward any other message to Socket.receive (action pipeline)
   def handle_map(message, state) when is_map(message) do
+    log_socket(:in, state, message)
     Socket.receive(state, message)
     {:ok, state}
   end
@@ -183,11 +233,30 @@ defmodule Mooncore.Endpoint.Socket.Handler do
     {:reply, :ok, {:text, content}, state}
   end
 
+  ## Cleanup on disconnect
+
+  def terminate(_reason, state) do
+    if state.anon do
+      Clients.remove_member(@anon_group, [@anon_channel], self())
+    else
+      if state.auth do
+        Clients.remove_member(state.auth["dkey"], state.listening, self())
+      end
+    end
+
+    :ok
+  end
+
   ## Channel management via process messages
 
   def handle_info({:listen, group, channel}, state) do
     Clients.add_member(group, channel, self())
-    state = Map.merge(state, %{listening: Enum.uniq(state.listening ++ [channel])})
+
+    state =
+      if channel in state.listening,
+        do: state,
+        else: %{state | listening: [channel | state.listening]}
+
     reply("channel_list", state.listening, state)
   end
 
@@ -198,15 +267,5 @@ defmodule Mooncore.Endpoint.Socket.Handler do
       Map.merge(state, %{listening: Enum.reject(state.listening, fn ch -> ch == channel end)})
 
     reply("channel_list", state.listening, state)
-  end
-
-  ## Termination
-
-  def terminate(_reason, state) do
-    if state.auth do
-      Clients.remove_member(state.auth["dkey"], state.listening, self())
-    end
-
-    {:ok, state}
   end
 end

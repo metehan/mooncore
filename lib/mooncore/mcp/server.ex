@@ -53,21 +53,29 @@ defmodule Mooncore.MCP.Server do
   end
 
   @doc "Get connected client counts for a pool. Requires mooncore_dev_tools."
-  def list_clients(pool \\ :default) do
+  def list_clients(pool \\ nil) do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
-    Clients.list_all(pool)
-    |> Enum.map(fn {group, channels} ->
-      channel_counts =
-        Enum.map(channels, fn {channel, pids} ->
-          %{channel: channel, count: length(pids)}
-        end)
+    pools =
+      if pool,
+        do: [if(is_binary(pool), do: String.to_existing_atom(pool), else: pool)],
+        else: Mooncore.config(:pools, [:default])
 
-      %{
-        group: group,
-        channels: channel_counts,
-        total: Enum.sum(Enum.map(channel_counts, & &1.count))
-      }
+    Enum.flat_map(pools, fn p ->
+      Clients.list_all(p)
+      |> Enum.map(fn {group, channels} ->
+        channel_counts =
+          Enum.map(channels, fn {channel, pids} ->
+            %{channel: channel, count: length(pids)}
+          end)
+
+        %{
+          pool: p,
+          group: group,
+          channels: channel_counts,
+          total: Enum.sum(Enum.map(channel_counts, & &1.count))
+        }
+      end)
     end)
   end
 
@@ -159,6 +167,76 @@ defmodule Mooncore.MCP.Server do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
     Watcher.clear()
     %{ok: true}
+  end
+
+  @doc """
+  Publish a WebSocket message to connected clients. Requires mooncore_dev_tools.
+
+  ## Params
+  - `group` — the dkey/group to target (required)
+  - `event` — event name string (required)
+  - `message` — payload map or value (required)
+  - `channels` — list of channel strings (default: ["main:default"])
+  """
+  def publish_socket(params) do
+    if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
+
+    group = params["group"]
+    event = params["event"]
+    message = params["message"]
+    channels = params["channels"] || ["main:default"]
+
+    if is_nil(group) or is_nil(event) or is_nil(message) do
+      %{error: "group, event, and message are required"}
+    else
+      Mooncore.Endpoint.Socket.publish(group, {event, message}, channels)
+      %{ok: true, group: group, event: event, channels: channels}
+    end
+  end
+
+  @doc """
+  Read WebSocket message logs with optional filters. Requires mooncore_dev_tools.
+
+  ## Options
+  - `limit` — max entries (default 100, max 1000)
+  - `user` — filter by username
+  - `channel` — filter by channel name
+  - `direction` — filter by "in", "out", or "publish"
+  - `since_id` — only return entries after this id (for polling)
+  """
+  def read_socket_logs(opts \\ %{}) do
+    if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
+
+    limit = min(opts["limit"] || 100, 1000)
+
+    base =
+      if opts["since_id"] do
+        Watcher.read_since(opts["since_id"])
+        |> Enum.filter(fn e -> e.tag == :socket end)
+      else
+        Watcher.read(:socket)
+      end
+
+    base
+    |> then(fn logs ->
+      if opts["user"],
+        do: Enum.filter(logs, fn e -> e.data[:user] == opts["user"] end),
+        else: logs
+    end)
+    |> then(fn logs ->
+      if opts["channel"],
+        do:
+          Enum.filter(logs, fn e ->
+            opts["channel"] in (e.data[:channels] || [])
+          end),
+        else: logs
+    end)
+    |> then(fn logs ->
+      if opts["direction"],
+        do: Enum.filter(logs, fn e -> to_string(e.data[:direction]) == opts["direction"] end),
+        else: logs
+    end)
+    |> Enum.take(limit)
   end
 
   @doc """

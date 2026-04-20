@@ -140,6 +140,52 @@ defmodule Mooncore.MCP.Protocol do
           },
           required: ["code"]
         }
+      },
+      %{
+        name: "list_clients",
+        description: "List connected WebSocket clients grouped by pool, group, and channel",
+        inputSchema: %{
+          type: "object",
+          properties: %{
+            pool: %{type: "string", description: "Pool name to query (default: all configured pools)"}
+          }
+        }
+      },
+      %{
+        name: "read_socket_logs",
+        description: "Read WebSocket message logs (incoming, outgoing, and server-publish events)",
+        inputSchema: %{
+          type: "object",
+          properties: %{
+            limit: %{type: "integer", description: "Max entries to return (default 100, max 1000)"},
+            user: %{type: "string", description: "Filter by username"},
+            channel: %{type: "string", description: "Filter by channel name (e.g. '@alice', 'main:default')"},
+            direction: %{
+              type: "string",
+              enum: ["in", "out", "publish"],
+              description: "Filter by message direction"
+            },
+            since_id: %{type: "integer", description: "Only return entries after this ID (for polling)"}
+          }
+        }
+      },
+      %{
+        name: "publish_socket",
+        description: "Publish a WebSocket message to connected clients in a group/channel",
+        inputSchema: %{
+          type: "object",
+          properties: %{
+            group: %{type: "string", description: "Group key (dkey) to target"},
+            event: %{type: "string", description: "Event name (e.g. 'notification', 'task-updated')"},
+            message: %{type: "object", description: "Payload to send"},
+            channels: %{
+              type: "array",
+              items: %{type: "string"},
+              description: "Target channels (default: ['main:default'])"
+            }
+          },
+          required: ["group", "event", "message"]
+        }
       }
     ]
   end
@@ -175,6 +221,21 @@ defmodule Mooncore.MCP.Protocol do
 
   defp call_tool("eval", _args) do
     {:error, -32602, "Missing required argument: code"}
+  end
+
+  defp call_tool("publish_socket", args) do
+    result = Server.publish_socket(args)
+    {:ok, tool_result(inspect(result, pretty: true))}
+  end
+
+  defp call_tool("list_clients", args) do
+    result = Server.list_clients(args["pool"])
+    {:ok, tool_result(Jason.encode!(result, pretty: true))}
+  end
+
+  defp call_tool("read_socket_logs", args) do
+    result = Server.read_socket_logs(args)
+    {:ok, tool_result(Jason.encode!(result, pretty: true))}
   end
 
   defp call_tool(name, _args) do
