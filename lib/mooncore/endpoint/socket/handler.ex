@@ -140,15 +140,26 @@ defmodule Mooncore.Endpoint.Socket.Handler do
           Clients.remove_member(@anon_group, [@anon_channel], self())
         end
 
+        # If already authenticated, remove all previous ETS memberships and
+        # reset listening so a re-auth with a different user/scope/token
+        # doesn't leave stale channel entries pointing to this PID.
+        listening =
+          if not state.anon and state.auth do
+            Clients.remove_member(state.auth["dkey"], state.listening, self())
+            []
+          else
+            state.listening
+          end
+
         # Only auto-subscribe to personal channel.
         # Scope channel (main:{scope}) requires explicit ["join", "main"].
         Clients.add_member(auth["dkey"], "@#{auth["user"]}", self())
         personal = "@#{auth["user"]}"
 
         listening =
-          if(personal in state.listening,
-            do: state.listening,
-            else: [personal | state.listening]
+          if(personal in listening,
+            do: listening,
+            else: [personal | listening]
           )
 
         state = Map.merge(state, %{auth: auth, anon: false, listening: listening})

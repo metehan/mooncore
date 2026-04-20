@@ -20,7 +20,7 @@ defmodule Mooncore.Endpoint.Socket.Clients do
 
   def init(name) do
     table = :ets.new(table_name(name), [:bag, :public, :named_table, {:read_concurrency, true}])
-    {:ok, %{table: table}}
+    {:ok, %{table: table, monitors: %{}}}
   end
 
   # ── Public API ──
@@ -66,7 +66,17 @@ defmodule Mooncore.Endpoint.Socket.Clients do
   def handle_cast({:add_member, group, channel, pid}, state) do
     # :bag ignores duplicate {key, value} pairs — no uniq needed
     :ets.insert(state.table, {{group, channel}, pid})
-    {:noreply, state}
+
+    # Monitor the PID so we can clean up if it crashes without calling terminate
+    monitors =
+      if Map.has_key?(state.monitors, pid) do
+        Map.update!(state.monitors, pid, &[{group, channel} | &1])
+      else
+        ref = Process.monitor(pid)
+        Map.put(state.monitors, pid, {ref, [{group, channel}]})
+      end
+
+    {:noreply, %{state | monitors: monitors}}
   end
 
   def handle_cast({:remove_member, group, channels, pid}, state) do
@@ -74,6 +84,41 @@ defmodule Mooncore.Endpoint.Socket.Clients do
       :ets.delete_object(state.table, {{group, channel}, pid})
     end)
 
-    {:noreply, state}
+    # Clean up monitor if no more entries for this PID
+    monitors =
+      case Map.get(state.monitors, pid) do
+        nil ->
+          state.monitors
+
+        {ref, entries} ->
+          remaining = Enum.reject(entries, fn {g, ch} -> g == group and ch in channels end)
+
+          if remaining == [] do
+            Process.demonitor(ref, [:flush])
+            Map.delete(state.monitors, pid)
+          else
+            Map.put(state.monitors, pid, {ref, remaining})
+          end
+      end
+
+    {:noreply, %{state | monitors: monitors}}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
+    # PID crashed or exited without calling terminate — clean up all its ETS entries
+    monitors =
+      case Map.pop(state.monitors, pid) do
+        {nil, m} ->
+          m
+
+        {{_ref, entries}, m} ->
+          Enum.each(entries, fn {group, channel} ->
+            :ets.delete_object(state.table, {{group, channel}, pid})
+          end)
+
+          m
+      end
+
+    {:noreply, %{state | monitors: monitors}}
   end
 end

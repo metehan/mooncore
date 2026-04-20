@@ -30,7 +30,9 @@ defmodule Mooncore.Auth.Token do
   end
 
   def token_config do
-    default_claims(default_exp: 60 * 60 * 18)
+    exp = Mooncore.config(:jwt, :exp, 60 * 60 * 18)
+
+    default_claims(default_exp: exp)
     |> add_claim("aud", fn -> "api" end, &(&1 == "api"))
     |> add_claim("iss", fn -> Mooncore.jwt(:issuer) end, &(&1 == Mooncore.jwt(:issuer)))
   end

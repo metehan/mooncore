@@ -319,7 +319,11 @@ defmodule Mooncore.MCP.Server do
     }
   end
 
-  defp safe_to_atom(str) when is_binary(str), do: String.to_existing_atom(str)
+  defp safe_to_atom(str) when is_binary(str) do
+    String.to_existing_atom(str)
+  rescue
+    ArgumentError -> nil
+  end
 
   defp safe_to_atom(atom) when is_atom(atom), do: atom
 end

@@ -156,12 +156,26 @@ defmodule Mooncore.Action do
     })
   end
 
+  @sensitive_keys [
+    :password,
+    "password",
+    :secret,
+    "secret",
+    :token,
+    "token",
+    :private_key,
+    "private_key",
+    :api_key,
+    "api_key"
+  ]
+
   defp sanitize_for_log(data) when is_map(data) do
     data
-    |> Map.drop([:password, "password", :secret, "secret"])
+    |> Map.drop(@sensitive_keys)
     |> Enum.map(fn
       {k, v} when is_pid(v) -> {k, inspect(v)}
       {k, %Plug.Conn{}} -> {k, "<conn>"}
+      {k, v} when is_map(v) -> {k, sanitize_for_log(v)}
       {k, v} -> {k, v}
     end)
     |> Map.new()
@@ -171,10 +185,7 @@ defmodule Mooncore.Action do
 
   defp sanitize_for_log(data), do: data
 
-  @doc """
-  Dispatch an action through the app registry routing.
-  Determines which app's action module handles the request based on auth.
-  """
+  @doc false
   def dispatch_to_app(action, request) do
     case Mooncore.App.info(request[:auth]["app"]) do
       %{action_module: action_module} ->
@@ -190,10 +201,7 @@ defmodule Mooncore.Action do
     end
   end
 
-  @doc """
-  Dispatch within a specific action module. Called by `use Mooncore.Action` generated `run/2`.
-  This is the core dispatcher — role check, deep merge, apply.
-  """
+  @doc false
   def dispatch(module, action, request) do
     request = enrich_request(action, request)
 
@@ -276,18 +284,23 @@ defmodule Mooncore.Action do
     end
   end
 
-  # Fallback: try command pattern "module.function"
+  # Fallback: if auth includes an app claim that isn't registered, fail immediately
+  # to prevent cross-app action leakage. Only search all apps when there is no app
+  # context at all (e.g. unauthenticated single-app setups).
   defp dispatch_fallback(action, request) do
-    # Check if any registered app's action module has this action
-    Mooncore.App.list()
-    |> Map.values()
-    |> Enum.find_value(fn app_info ->
-      mod = app_info[:action_module]
+    if get_in(request, [:auth, "app"]) do
+      %{error: "Undefined action"}
+    else
+      Mooncore.App.list()
+      |> Map.values()
+      |> Enum.find_value(fn app_info ->
+        mod = app_info[:action_module]
 
-      if mod && Map.has_key?(mod.actions_map(), action) do
-        mod.run(action, request)
-      end
-    end) || %{error: "Undefined action"}
+        if mod && Map.has_key?(mod.actions_map(), action) do
+          mod.run(action, request)
+        end
+      end) || %{error: "Undefined action"}
+    end
   end
 
   # Command fallback: "module.function" → App.Command.Module.function/1

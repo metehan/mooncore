@@ -27,6 +27,8 @@ defmodule Mooncore.Dev.Plug do
     pass: ["text/*", "application/json"]
   )
 
+  plug(:check_dev_auth)
+
   plug(:match)
   plug(:dispatch)
 
@@ -119,6 +121,30 @@ defmodule Mooncore.Dev.Plug do
     conn
     |> put_resp_content_type("text/html")
     |> send_resp(200, Mooncore.Dev.Page.render())
+  end
+
+  # ── Dev Auth Login ──
+
+  post "/dev/login" do
+    secret = System.get_env("MOONCORE_DEV_SECRET") || ""
+    password = conn.body_params["password"] || ""
+
+    if byte_size(secret) > 0 and password == secret do
+      token = dev_session_token(secret)
+
+      conn
+      |> put_resp_cookie("mooncore_dev", token,
+        http_only: true,
+        same_site: "Strict",
+        max_age: 60 * 60 * 24 * 7
+      )
+      |> put_resp_content_type("application/json")
+      |> send_resp(200, Jason.encode!(%{ok: true}))
+    else
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(401, Jason.encode!(%{error: "invalid password"}))
+    end
   end
 
   # ── JSON API ──
@@ -633,6 +659,99 @@ defmodule Mooncore.Dev.Plug do
 
   match _ do
     send_resp(conn, 404, "Not Found")
+  end
+
+  defp check_dev_auth(conn, _opts) do
+    secret = System.get_env("MOONCORE_DEV_SECRET")
+
+    if is_binary(secret) and byte_size(secret) > 0 do
+      conn = fetch_cookies(conn)
+      token = dev_session_token(secret)
+      header_val = get_req_header(conn, "x-dev-secret") |> List.first()
+      authed = header_val == secret or conn.cookies["mooncore_dev"] == token
+
+      if authed or conn.request_path == "/dev/login" do
+        conn
+      else
+        if String.starts_with?(conn.request_path, "/api/") or conn.request_path == "/mcp" do
+          conn
+          |> put_resp_content_type("application/json")
+          |> send_resp(401, Jason.encode!(%{error: "unauthorized"}))
+          |> halt()
+        else
+          conn
+          |> put_resp_content_type("text/html")
+          |> send_resp(200, dev_login_page())
+          |> halt()
+        end
+      end
+    else
+      conn
+    end
+  end
+
+  defp dev_session_token(secret) do
+    :crypto.mac(:hmac, :sha256, secret, "mooncore-dev-session")
+    |> Base.url_encode64(padding: false)
+  end
+
+  defp dev_login_page do
+    """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Mooncore DevTools</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif;
+               display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+                padding: 2rem; width: 100%; max-width: 360px; }
+        h1 { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.25rem; }
+        p { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1.5rem; }
+        code { background: #0f172a; padding: 1px 5px; border-radius: 4px; font-size: 0.8rem; }
+        input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+                padding: 0.6rem 0.75rem; color: #e2e8f0; font-size: 0.95rem; outline: none; }
+        input:focus { border-color: #6366f1; }
+        button { margin-top: 0.75rem; width: 100%; background: #6366f1; color: white;
+                 border: none; border-radius: 6px; padding: 0.65rem; font-size: 0.95rem;
+                 cursor: pointer; font-weight: 500; }
+        button:hover { background: #4f46e5; }
+        .error { margin-top: 0.75rem; color: #f87171; font-size: 0.85rem; display: none; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>Mooncore DevTools</h1>
+        <p>Enter the <code>MOONCORE_DEV_SECRET</code> to continue.</p>
+        <input type="password" id="pw" placeholder="Secret" autofocus>
+        <button onclick="login()">Unlock</button>
+        <div class="error" id="err">Incorrect secret.</div>
+      </div>
+      <script>
+        document.getElementById('pw').addEventListener('keydown', e => {
+          if (e.key === 'Enter') login();
+        });
+        async function login() {
+          const pw = document.getElementById('pw').value;
+          const res = await fetch('/dev/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: pw})
+          });
+          if (res.ok) {
+            location.href = '/';
+          } else {
+            document.getElementById('err').style.display = 'block';
+            document.getElementById('pw').select();
+          }
+        }
+      </script>
+    </body>
+    </html>
+    """
   end
 
   defp project_root do
