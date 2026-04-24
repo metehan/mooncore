@@ -1169,6 +1169,8 @@
       const [actions, setActions] = useState([]);
       const [apps, setApps] = useState([]);
       const [loading, setLoading] = useState(true);
+      const [filterText, setFilterText] = useState('');
+      const [filterRole, setFilterRole] = useState('');
       useEffect(() => {
         Promise.all([
           api('/api/actions').then(d => d.actions || []),
@@ -1187,11 +1189,54 @@
         grouped[key].push(a);
       });
 
+      // Collect all unique roles for the filter dropdown
+      const allRoles = useMemo(() => {
+        const roles = new Set();
+        actions.forEach(a => { (a.roles || []).forEach(r => roles.add(r)); });
+        return Array.from(roles).sort();
+      }, [actions]);
+
+      const filteredGrouped = useMemo(() => {
+        const result = {};
+        Object.entries(grouped).forEach(([appKey, appActions]) => {
+          const filtered = appActions.filter(a => {
+            // Text filter: match action name or handler
+            if (filterText) {
+              const q = filterText.toLowerCase();
+              if (!a.action.toLowerCase().includes(q) && !(a.handler || '').toLowerCase().includes(q)) {
+                return false;
+              }
+            }
+            // Role filter
+            if (filterRole === 'public') {
+              if (!a.public) return false;
+            } else if (filterRole) {
+              if (a.public || !(a.roles || []).includes(filterRole)) return false;
+            }
+            return true;
+          });
+          if (filtered.length > 0) result[appKey] = filtered;
+        });
+        return result;
+      }, [grouped, filterText, filterRole]);
+
+      const totalFiltered = Object.values(filteredGrouped).reduce((sum, arr) => sum + arr.length, 0);
+
       return html`
       <div class="h-full flex flex-col">
-      <${SectionHeader} title="Api" count=${actions.length} />
+      <${SectionHeader} title="Api" count=${totalFiltered} />
+      <div class="px-4 py-2 border-b border-gray-800 flex items-center gap-2 bg-gray-900/30">
+        <input class="flex-1 bg-gray-950 border border-gray-800 rounded px-3 py-1.5 text-xs text-gray-200"
+          placeholder="Filter by name or handler..." value=${filterText} onInput=${e => setFilterText(e.target.value)} />
+        <select class="bg-gray-950 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300"
+          value=${filterRole} onChange=${e => setFilterRole(e.target.value)}>
+          <option value="">All roles</option>
+          <option value="public">public</option>
+          ${allRoles.map(r => html`<option key=${r} value=${r}>${r}</option>`)}
+        </select>
+      </div>
       <div class="flex-1 overflow-y-auto">
-        ${Object.entries(grouped).map(([appKey, appActions]) => {
+        ${Object.entries(filteredGrouped).map(([appKey, appActions]) => {
         const app = appMap[appKey];
         return html`
             <div key=${appKey}>

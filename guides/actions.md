@@ -9,12 +9,12 @@ Actions are the core abstraction in Mooncore. Every feature in your application 
 ```elixir
 defmodule MyApp.Action do
   @actions %{
-    "task.create"    => {MyApp.Action.Task, :create, ~w(user admin), %{}},
-    "task.list"      => {MyApp.Action.Task, :list, ~w(user admin), %{}},
-    "task.delete"    => {MyApp.Action.Task, :delete, ~w(admin), %{}},
-    "user.profile"   => {MyApp.Action.User, :profile, ~w(user admin), %{}},
-    "echo"           => {MyApp.Action.Echo, :echo, [], %{}},
-    "health.check"   => {MyApp.Action.Health, :check, [], %{}},
+    "task.create"  => %{handler: {MyApp.Action.Task, :create}, roles: ~w(user admin)},
+    "task.list"    => %{handler: {MyApp.Action.Task, :list}, roles: ~w(user admin)},
+    "task.delete"  => %{handler: {MyApp.Action.Task, :delete}, roles: ~w(admin)},
+    "user.profile" => %{handler: {MyApp.Action.User, :profile}, roles: ~w(user admin)},
+    "echo"         => %{handler: {MyApp.Action.Echo, :echo}},
+    "health.check" => %{handler: {MyApp.Action.Health, :check}},
   }
 
   use Mooncore.Action
@@ -25,37 +25,62 @@ end
 > function will return `nil` and no actions will dispatch. This is silent — no
 > compile error — so always put `@actions` first.
 
-### Action Tuple Format
+### Action Map Format
 
-```elixir
-"action.name" => {HandlerModule, :function, required_roles, request_modifications}
-```
+Each entry is a map with the following keys:
 
-| Field                   | Type   | Description                                  |
-| ----------------------- | ------ | -------------------------------------------- |
-| `HandlerModule`         | module | The module containing the handler function   |
-| `:function`             | atom   | The function name to call                    |
-| `required_roles`        | list   | Role strings. `[]` = public (no auth needed) |
-| `request_modifications` | map    | Merged into request before calling handler   |
+| Key          | Type             | Required | Description                                                                         |
+| ------------ | ---------------- | -------- | ----------------------------------------------------------------------------------- |
+| `:handler`   | `{Module, :fn}`  | yes      | The module and function to call                                                     |
+| `:roles`     | list of strings  | no       | Required roles. Omit or `[]` for public (no auth)                                   |
+| `:overrides` | map              | no       | Deep-merged into the request, **overriding** any incoming params with the same keys |
+| `:validate`  | schema (keyword) | no       | `Mooncore.Validate` schema checked against params before the handler is called      |
 
-### Request Modifications
+### Overrides
 
-The fourth element lets you inject extra data into the request for specific actions:
+The `:overrides` key lets you inject server-controlled values that callers cannot alter.
+Both actions below call the same handler but force different output format:
 
 ```elixir
 @actions %{
-  "report.generate" => {MyApp.Action.Report, :generate, ~w(admin), %{
-    format: "pdf",
-    timeout: 30_000
-  }},
-  "report.preview" => {MyApp.Action.Report, :generate, ~w(user), %{
-    format: "html",
-    timeout: 5_000
-  }},
+  "report.pdf"     => %{handler: {MyApp.Action.Report, :generate}, roles: ~w(admin), overrides: %{format: "pdf"}},
+  "report.preview" => %{handler: {MyApp.Action.Report, :generate}, roles: ~w(user),  overrides: %{format: "html"}},
 }
 ```
 
-Both actions call the same function, but with different configuration merged into the request. The handler reads `req[:format]` and `req[:timeout]` without knowing where they came from.
+The handler reads `req[:format]` — even if the caller sends `"format": "csv"` in the request, the override wins.
+
+### Validation
+
+The `:validate` key accepts a `Mooncore.Validate` schema — a list of `{field, rules}` tuples.
+It is checked against `params` **before** the handler or role check runs. On failure the caller
+receives the error immediately — the handler is never called.
+
+Since HTTP/WebSocket params are string-keyed, use **string keys** in your schema:
+
+```elixir
+@actions %{
+  "task.create" => %{
+    handler:  {MyApp.Action.Task, :create},
+    roles:    ~w(user),
+    validate: [
+      {"title",    [:required, :string, {:min_length, 2}, {:max_length, 200}]},
+      {"priority", [:integer, {:in, [1, 2, 3]}]},
+      {"due_date", [:iso8601]},
+      {["address", "city"], [:string]}   # nested path
+    ]
+  },
+}
+```
+
+On failure the caller receives:
+
+```json
+{"error": "validation_failed", "errors": {"title": ["is required"]}}
+```
+
+Use **atom keys** only when calling actions directly from Elixir with atom-keyed maps.
+See `Mooncore.Validate` for the full list of available rules.
 
 ## Writing Handlers
 
@@ -113,9 +138,8 @@ The request map contains everything the handler needs:
   },
   # Additional keys from middleware:
   db: #DBConnection<...>,     # from MyApp.Middleware.DB
-  # Additional keys from request_modifications:
-  format: "pdf",              # from action tuple
-  timeout: 30_000
+  # Additional keys from action overrides:
+  format: "pdf",              # from :overrides in action map
 }
 ```
 

@@ -9,9 +9,9 @@ defmodule Mooncore.Action do
 
       defmodule MyApp.Action do
         @actions %{
-          "task.create" => {MyApp.Action.Task, :create, ~w(user), %{}},
-          "task.list"   => {MyApp.Action.Task, :list, ~w(user), %{}},
-          "echo"        => {MyApp.Action.Echo, :echo, [], %{}},
+          "task.create" => %{handler: {MyApp.Action.Task, :create}, roles: ~w(user)},
+          "task.list"   => %{handler: {MyApp.Action.Task, :list}, roles: ~w(user)},
+          "echo"        => %{handler: {MyApp.Action.Echo, :echo}},
         }
 
         use Mooncore.Action
@@ -21,12 +21,45 @@ defmodule Mooncore.Action do
   > The macro captures `@actions` at compile time — if it's defined after,
   > `actions_map/0` will return `nil` and nothing will dispatch.
 
-  Actions are defined as:
+  Actions are defined as maps with the following keys:
 
-      "action.name" => {Module, :function, required_roles, request_modifications}
+  - `:handler` — `{Module, :function}` tuple **(required)**
+  - `:roles` — list of role strings. Omit or set `[]` for public (no auth needed).
+  - `:overrides` — map deep-merged into the request before calling the handler,
+    **overriding** any incoming params with the same keys. Use this to force
+    server-controlled values (e.g. `%{format: "pdf"}`) regardless of what
+    the caller sends.
+  - `:validate` — a `Mooncore.Validate` schema (keyword list of `field: [rules]`)
+    applied to `params` **before** the handler is called. If validation fails,
+    an error is returned immediately without reaching the handler.
 
-  - `required_roles` — list of role strings. `[]` means public (no auth needed).
-  - `request_modifications` — map deep-merged into the request before calling the handler.
+  ### Overrides Example
+
+  Both routes call the same handler but force different config:
+
+      @actions %{
+        "report.pdf"     => %{handler: {MyApp.Action.Report, :generate}, roles: ~w(admin), overrides: %{format: "pdf"}},
+        "report.preview" => %{handler: {MyApp.Action.Report, :generate}, roles: ~w(user),  overrides: %{format: "html"}},
+      }
+
+  The handler reads `req[:format]` — callers cannot override it.
+
+  ### Validate Example
+
+      @actions %{
+        "task.create" => %{
+          handler:  {MyApp.Action.Task, :create},
+          roles:    ~w(user),
+          validate: [
+            {"title",    [:required, :string, {:min_length, 2}]},
+            {"priority", [:integer, {:in, [1, 2, 3]}]}
+          ]
+        }
+      }
+
+  On failure the caller receives `%{error: "validation_failed", errors: %{"title" => ["is required"]}}`.
+  Use string keys to match HTTP/WebSocket params; atom keys for internal Elixir calls;
+  list paths (`["address", "city"]`) for nested maps.
 
   ## Request Map Structure
 
@@ -232,16 +265,72 @@ defmodule Mooncore.Action do
 
   defp do_dispatch(module, action, request) do
     case Map.get(module.actions_map(), action) do
-      {handler_mod, function, [], req_mod} ->
-        merged_request = deep_merge_request(request, req_mod)
-        apply(handler_mod, function, [merged_request])
+      # Map format: %{handler: {Mod, :func}, roles: [...], overrides: %{}, validate: [...]}
+      %{handler: {handler_mod, function}} = entry ->
+        roles = Map.get(entry, :roles, [])
+        overrides = Map.get(entry, :overrides, %{})
+        schema = Map.get(entry, :validate)
+
+        cond do
+          roles != [] and not check_roles(request[:auth]["roles"], roles) ->
+            %{error: "Access denied"}
+
+          schema != nil ->
+            case validate_params(request[:params], schema) do
+              :ok ->
+                merged_request = deep_merge_request(request, overrides)
+                apply(handler_mod, function, [merged_request])
+
+              {:error, errors} ->
+                %{error: "validation_failed", errors: errors}
+            end
+
+          true ->
+            merged_request = deep_merge_request(request, overrides)
+            apply(handler_mod, function, [merged_request])
+        end
+
+      # Legacy tuple format — multiple arities (backward compat)
+      # {Mod, :fn}
+      # {Mod, :fn, roles}
+      # {Mod, :fn, roles, overrides}
+      # {Mod, :fn, roles, overrides, validate}
+      {handler_mod, function} ->
+        apply(handler_mod, function, [request])
+
+      {handler_mod, function, action_roles} ->
+        if action_roles == [] or check_roles(request[:auth]["roles"], action_roles) do
+          apply(handler_mod, function, [request])
+        else
+          %{error: "Access denied"}
+        end
 
       {handler_mod, function, action_roles, req_mod} ->
-        if check_roles(request[:auth]["roles"], action_roles) do
+        if action_roles == [] or check_roles(request[:auth]["roles"], action_roles) do
           merged_request = deep_merge_request(request, req_mod)
           apply(handler_mod, function, [merged_request])
         else
           %{error: "Access denied"}
+        end
+
+      {handler_mod, function, action_roles, req_mod, schema} ->
+        cond do
+          action_roles != [] and not check_roles(request[:auth]["roles"], action_roles) ->
+            %{error: "Access denied"}
+
+          schema != nil ->
+            case validate_params(request[:params], schema) do
+              :ok ->
+                merged_request = deep_merge_request(request, req_mod)
+                apply(handler_mod, function, [merged_request])
+
+              {:error, errors} ->
+                %{error: "validation_failed", errors: errors}
+            end
+
+          true ->
+            merged_request = deep_merge_request(request, req_mod)
+            apply(handler_mod, function, [merged_request])
         end
 
       nil ->
@@ -330,6 +419,19 @@ defmodule Mooncore.Action do
         %{error: "Unknown action"}
     end
   end
+
+  # Validates request params against an action schema.
+  # String key normalization is handled inside Mooncore.Validate.
+  defp validate_params(params, schema) when is_list(schema) do
+    params = params || %{}
+
+    case Mooncore.Validate.run_schema(params, schema) do
+      {:ok, _} -> :ok
+      {:error, _} = err -> err
+    end
+  end
+
+  defp validate_params(_params, nil), do: :ok
 
   defp run_hooks(data, hook_type) do
     Mooncore.config(hook_type, [])
