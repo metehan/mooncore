@@ -114,13 +114,36 @@ defmodule Mooncore.Dev.Plug do
 
   # ── Static Assets ──
 
-  get "/assets/mooncore.png" do
-    png_path = Path.join(:code.priv_dir(:mooncore), "static/mooncore.png")
+  @static_dir Path.join(__DIR__, "static")
 
-    case File.read(png_path) do
+  get "/assets/*path" do
+    file = Path.join([@static_dir | path])
+
+    if String.starts_with?(Path.expand(file), @static_dir) do
+      case File.read(file) do
+        {:ok, data} ->
+          mime = MIME.from_path(file)
+
+          conn
+          |> put_resp_content_type(mime)
+          |> put_resp_header("cache-control", "no-cache")
+          |> send_resp(200, data)
+
+        {:error, _} ->
+          send_resp(conn, 404, "Not Found")
+      end
+    else
+      send_resp(conn, 403, "Forbidden")
+    end
+  end
+
+  get "/favicon.ico" do
+    file = Path.join(@static_dir, "favicon.ico")
+
+    case File.read(file) do
       {:ok, data} ->
         conn
-        |> put_resp_content_type("image/png")
+        |> put_resp_content_type("image/x-icon")
         |> put_resp_header("cache-control", "public, max-age=86400")
         |> send_resp(200, data)
 
@@ -132,9 +155,15 @@ defmodule Mooncore.Dev.Plug do
   # ── HTML Dashboard ──
 
   get "/" do
+    base =
+      case conn.script_name do
+        [] -> ""
+        parts -> "/" <> Enum.join(parts, "/")
+      end
+
     conn
     |> put_resp_content_type("text/html")
-    |> send_resp(200, Mooncore.Dev.Page.render())
+    |> send_resp(200, Mooncore.Dev.Page.render(base))
   end
 
   # ── Dev Auth Login ──

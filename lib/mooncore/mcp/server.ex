@@ -37,19 +37,65 @@ defmodule Mooncore.MCP.Server do
 
       if mod && function_exported?(mod, :actions_map, 0) do
         mod.actions_map()
-        |> Enum.map(fn {action_name, {handler_mod, function, roles, _req_mod}} ->
-          %{
-            app: app_key,
-            action: action_name,
-            handler: "#{inspect(handler_mod)}.#{function}",
-            roles: roles,
-            public: roles == []
-          }
+        |> Enum.map(fn {action_name, entry} ->
+          action_entry(action_name, app_key, entry)
         end)
       else
         []
       end
     end)
+  end
+
+  # Normalize any entry format to a consistent map.
+  # Handles: map, {Mod, :fn}, {Mod, :fn, roles}, {Mod, :fn, roles, overrides}, {Mod, :fn, roles, overrides, validate}
+  defp action_entry(action_name, app_key, %{handler: {handler_mod, function}} = entry) do
+    %{
+      app: app_key,
+      action: action_name,
+      handler: "#{inspect(handler_mod)}.#{function}",
+      arity: "map",
+      roles: Map.get(entry, :roles, []),
+      overrides: Map.get(entry, :overrides, %{}),
+      validate: Map.get(entry, :validate),
+      public: Map.get(entry, :roles, []) == []
+    }
+  end
+
+  defp action_entry(action_name, app_key, entry) do
+    size = tuple_size(entry)
+    handler_mod = elem(entry, 0)
+    function = elem(entry, 1)
+
+    defaults = %{
+      app: app_key,
+      action: action_name,
+      handler: "#{inspect(handler_mod)}.#{function}",
+      arity: Integer.to_string(size)
+    }
+
+    case entry do
+      {_, _} ->
+        Map.merge(defaults, %{roles: [], overrides: %{}, validate: nil, public: true})
+
+      {_, _, roles} ->
+        Map.merge(defaults, %{roles: roles, overrides: %{}, validate: nil, public: roles == []})
+
+      {_, _, roles, req_mod} ->
+        Map.merge(defaults, %{
+          roles: roles,
+          overrides: req_mod,
+          validate: nil,
+          public: roles == []
+        })
+
+      {_, _, roles, overrides, validate} ->
+        Map.merge(defaults, %{
+          roles: roles,
+          overrides: overrides,
+          validate: validate,
+          public: roles == []
+        })
+    end
   end
 
   @doc "Get connected client counts for a pool. Requires mooncore_dev_tools."
