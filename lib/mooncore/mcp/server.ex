@@ -56,7 +56,7 @@ defmodule Mooncore.MCP.Server do
       arity: "map",
       roles: Map.get(entry, :roles, []),
       overrides: Map.get(entry, :overrides, %{}),
-      validate: Map.get(entry, :validate),
+      validate: normalize_validate(Map.get(entry, :validate)),
       public: Map.get(entry, :roles, []) == []
     }
   end
@@ -92,11 +92,50 @@ defmodule Mooncore.MCP.Server do
         Map.merge(defaults, %{
           roles: roles,
           overrides: overrides,
-          validate: validate,
+          validate: normalize_validate(validate),
           public: roles == []
         })
     end
   end
+
+  # Convert validate tuples to maps for JSON serialization.
+  # Input: [{"field_name", [:required, :string, {:min_length, 2}]}]
+  # Output: [%{name: "field_name", rules: ["required", "string", %{min_length: 2}]}]
+  defp normalize_validate(nil), do: nil
+
+  defp normalize_validate(validate) when is_list(validate) do
+    Enum.map(validate, fn
+      {name, rules} when is_list(rules) ->
+        %{name: name, rules: normalize_rules(rules)}
+
+      {name, rules} ->
+        %{name: name, rules: [rules]}
+
+      other ->
+        other
+    end)
+  end
+
+  defp normalize_validate({:nested, schema}) do
+    %{nested: normalize_validate(schema)}
+  end
+
+  defp normalize_validate(other), do: other
+
+  defp normalize_rules(rules) when is_list(rules) do
+    Enum.map(rules, fn
+      {:nested, schema} ->
+        %{nested: normalize_validate(schema)}
+
+      tuple when is_tuple(tuple) ->
+        inspect(tuple)
+
+      v ->
+        v
+    end)
+  end
+
+  defp normalize_rules(other), do: other
 
   @doc "Get connected client counts for a pool. Requires mooncore_dev_tools."
   def list_clients(pool \\ nil) do
