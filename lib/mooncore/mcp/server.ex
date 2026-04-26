@@ -217,8 +217,8 @@ defmodule Mooncore.MCP.Server do
       }
 
       try do
-        result = Mooncore.Action.execute(action, request)
-        %{ok: true, result: Mooncore.Action.format_response(result)}
+        Mooncore.Action.execute(action, request)
+        |> Mooncore.Action.format_response()
       rescue
         e ->
           %{error: Exception.message(e), stacktrace: Exception.format(:error, e, __STACKTRACE__)}
