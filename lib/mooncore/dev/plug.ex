@@ -700,6 +700,86 @@ defmodule Mooncore.Dev.Plug do
     end
   end
 
+  # ── Custom Pages / Devtools API ──
+
+  get "/api/devtools/pages" do
+    pages = Mooncore.Dev.Devtools.get_pages()
+    # Already normalized to JSON-safe maps in Devtools
+    pages_list = Enum.map(pages, fn {name, defn} -> %{name: name, definition: defn} end)
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(%{pages: pages_list}))
+  end
+
+  get "/api/devtools/page" do
+    page_name = conn.query_params["name"] || ""
+
+    case Mooncore.Dev.Devtools.get_page(page_name) do
+      {:ok, defn} ->
+        # Already JSON-safe from Devtools.normalize_page_def
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(200, Jason.encode!(defn))
+
+      {:error, :not_found} ->
+        json_error(conn, 404, "Page not found: #{page_name}")
+    end
+  end
+
+  get "/api/devtools/data" do
+    source_type = conn.query_params["type"] || ""
+    source_key = conn.query_params["key"] || ""
+
+    source =
+      case source_type do
+        "metric" -> {:metric, source_key}
+        "collection" -> {:collection, source_key}
+        "timeseries" -> {:timeseries, source_key}
+        _ -> nil
+      end
+
+    if source do
+      case Mooncore.Dev.Devtools.get_data(source) do
+        {:ok, data} ->
+          conn
+          |> put_resp_content_type("application/json")
+          |> send_resp(200, Jason.encode!(%{data: data}))
+
+        {:error, :not_found} ->
+          json_error(conn, 404, "Data not found")
+      end
+    else
+      json_error(conn, 400, "Invalid source type")
+    end
+  end
+
+  post "/api/devtools/eval" do
+    code = conn.body_params["code"] || ""
+    widget_id = conn.body_params["widget_id"]
+    item_json = conn.body_params["item"]
+
+    result =
+      try do
+        bindings =
+          if item_json do
+            item = Jason.decode!(item_json)
+            [{:item, item}]
+          else
+            []
+          end
+
+        {result, _} = Code.eval_string(code, bindings)
+        %{ok: true, result: inspect(result)}
+      rescue
+        e -> %{ok: false, error: Exception.message(e)}
+      end
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(result))
+  end
+
   match _ do
     send_resp(conn, 404, "Not Found")
   end

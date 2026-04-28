@@ -51,6 +51,7 @@ defmodule Mooncore.Application do
 
         [
           {Mooncore.MCP.Watcher, []},
+          {Mooncore.Dev.Devtools, []},
           {Bandit, plug: Mooncore.Dev.Plug, port: mcp_port, scheme: :http}
           |> Supervisor.child_spec(id: :mcp_server)
         ]

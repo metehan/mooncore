@@ -6,8 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mooncore Dev</title>
   <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime" defer></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css" media="print" onload="this.media='all'">
 
   <style>
     * {
@@ -284,6 +282,10 @@
   <div id="app" class="flex-1 flex flex-col overflow-hidden"></div>
 
   <!-- External scripts loaded here so preloader renders first -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css"
+    media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css"
+    media="print" onload="this.media='all'">
   <script src="https://cdn.jsdelivr.net/npm/preact@10.19.3/dist/preact.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/preact@10.19.3/hooks/dist/hooks.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
@@ -310,6 +312,7 @@
   <script src="${BASE}/assets/js/page-console.js"></script>
   <script src="${BASE}/assets/js/page-files.js"></script>
   <script src="${BASE}/assets/js/page-guides.js"></script>
+  <script src="${BASE}/assets/js/page-custom-pages.js"></script>
   <script src="${BASE}/assets/js/editor.js"></script>
 </body>
 
