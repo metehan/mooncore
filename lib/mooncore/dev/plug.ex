@@ -1,4 +1,6 @@
 defmodule Mooncore.Dev.Plug do
+  import Bitwise
+
   @moduledoc """
   Development dashboard and MCP server plug.
 
@@ -15,16 +17,25 @@ defmodule Mooncore.Dev.Plug do
 
       config :mooncore,
         mooncore_dev_tools: true,
-        mcp_port: 4040   # default
+        mcp_port: 4040,                # default
+        dev_tools_allowed_ips: [        # optional IP allowlist
+          "127.0.0.1",
+          "::1",
+          "10.0.0.0/8"
+        ],
+        oauth_redirect_uris: [          # optional extra OAuth redirect URI allowlist
+          "https://myapp.example.com/callback"
+        ]
   """
 
   use Plug.Router
 
   plug(:check_mooncore_dev_tools)
+  plug(:check_dev_ip)
 
   plug(Plug.Parsers,
-    parsers: [{:json, json_decoder: Jason}],
-    pass: ["text/*", "application/json"]
+    parsers: [:urlencoded, {:json, json_decoder: Jason}],
+    pass: ["application/json", "application/x-www-form-urlencoded"]
   )
 
   plug(:check_dev_auth)
@@ -41,6 +52,115 @@ defmodule Mooncore.Dev.Plug do
       |> send_resp(404, "Not Found")
       |> halt()
     end
+  end
+
+  # ── Dev Tools IP Allowlist ──
+
+  @doc """
+  IP allowlist check for dev tools.
+
+  If `dev_tools_allowed_ips` is configured, only requests from
+  allowed IPs pass through. CIDR ranges (e.g. `"10.0.0.0/8"`) are supported.
+  If the config is `nil` or empty, all IPs are allowed (backwards compatible).
+  """
+  def check_dev_ip(conn, _opts) do
+    allowed_ips = Mooncore.dev_tools_allowed_ips()
+
+    if is_nil(allowed_ips) or allowed_ips == [] do
+      conn
+    else
+      client_ip_str = client_ip(conn)
+
+      if ip_allowed?(client_ip_str, allowed_ips) do
+        conn
+      else
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(403, Jason.encode!(%{error: "Forbidden"}))
+        |> halt()
+      end
+    end
+  end
+
+  defp client_ip(conn) do
+    conn
+    |> Plug.Conn.get_req_header("x-forwarded-for")
+    |> List.first()
+    |> case do
+      nil -> remote_ip(conn)
+      ip when is_binary(ip) -> ip |> String.split(",") |> List.first() |> String.trim()
+    end
+  end
+
+  defp remote_ip(conn) do
+    conn.remote_ip |> Tuple.to_list() |> Enum.join(".")
+  end
+
+  defp ip_allowed?(client_ip, allowed_ips) do
+    client = ip_to_tuple(client_ip)
+    Enum.any?(allowed_ips, &match_cidr?(client, &1))
+  end
+
+  defp ip_to_tuple(ip) when is_binary(ip) do
+    if String.contains?(ip, ":") do
+      # IPv6
+      ip
+      |> String.split(":")
+      |> Enum.map(&String.pad_leading(String.trim(&1), 4, ?0))
+      |> Enum.join(":")
+      |> then(&:inet.parse_ipv6_address/1)
+      |> case do
+        {:ok, addr} -> addr
+        _ -> nil
+      end
+    else
+      # IPv4
+      ip
+      |> String.split(".")
+      |> Enum.map(&String.to_integer/1)
+      |> List.to_tuple()
+    end
+  end
+
+  defp ip_to_tuple(_), do: nil
+
+  defp match_cidr?(client_ip, cidr_entry) when is_tuple(client_ip) and is_binary(cidr_entry) do
+    if String.contains?(cidr_entry, "/") do
+      [prefix, bits_s] = String.split(cidr_entry, "/")
+      bits = String.to_integer(bits_s)
+      target = ip_to_tuple(prefix)
+      match_cidr_bits(client_ip, target, bits)
+    else
+      ip_to_tuple(cidr_entry) == client_ip
+    end
+  end
+
+  defp match_cidr_bits(client_ip, target, bits) when tuple_size(client_ip) == 4 do
+    # IPv4
+    mask = if bits == 0, do: 0, else: (1 <<< 32) - 1 - ((1 <<< (32 - bits)) - 1)
+    client_int = ip_to_int(client_ip)
+    target_int = ip_to_int(target)
+    (client_int &&& mask) == (target_int &&& mask)
+  end
+
+  defp match_cidr_bits(client_ip, target, bits) when tuple_size(client_ip) == 8 do
+    # IPv6
+    mask = if bits == 0, do: 0, else: (1 <<< 128) - 1 - ((1 <<< (128 - bits)) - 1)
+    client_int = ip_to_int_v6(client_ip)
+    target_int = ip_to_int_v6(target)
+    (client_int &&& mask) == (target_int &&& mask)
+  end
+
+  defp match_cidr_bits(_, _, _), do: false
+
+  defp ip_to_int({a, b, c, d}) do
+    a <<< 24 ||| b <<< 16 ||| c <<< 8 ||| d
+  end
+
+  defp ip_to_int_v6({a, b, c, d, e, f, g, h}) do
+    Enum.reduce({a, b, c, d, e, f, g, h}, 0, fn seg, acc ->
+      acc <<< 16 ||| seg
+    end)
   end
 
   # ── Standard MCP Protocol (JSON-RPC 2.0, Streamable HTTP) ──
@@ -168,21 +288,54 @@ defmodule Mooncore.Dev.Plug do
 
   # ── Dev Auth Login ──
 
+  @dev_session_expiry_options %{
+    "1h" => 3600,
+    "8h" => 28800,
+    "1d" => 86_400,
+    "1w" => 604_800,
+    "1m" => 2_592_000
+  }
+
   post "/dev/login" do
     secret = System.get_env("MOONCORE_DEV_SECRET") || ""
     password = conn.body_params["password"] || ""
+    expiry_label = conn.body_params["expiry"] || "1w"
+    expiry_seconds = Map.get(@dev_session_expiry_options, expiry_label, 604_800)
 
-    if byte_size(secret) > 0 and password == secret do
-      token = dev_session_token(secret)
+    if byte_size(secret) > 0 and byte_size(password) > 0 and
+         Plug.Crypto.secure_compare(password, secret) do
+      now = System.system_time(:second)
+      expiry_ts = now + expiry_seconds
+      token = dev_session_token(secret, expiry_ts)
 
+      base_url =
+        conn
+        |> request_url()
+        |> URI.parse()
+        |> then(fn %URI{scheme: s, host: h, port: p} ->
+          "#{s}://#{h}#{if (s == "http" and p == 80) or (s == "https" and p == 443), do: "", else: ":#{p}"}"
+        end)
+
+      # Store expiry alongside token so check_dev_auth can verify it
       conn
       |> put_resp_cookie("mooncore_dev", token,
         http_only: true,
         same_site: "Strict",
-        max_age: 60 * 60 * 24 * 7
+        max_age: expiry_seconds
+      )
+      |> put_resp_cookie("mooncore_dev_exp", Integer.to_string(expiry_ts),
+        http_only: false,
+        same_site: "Strict",
+        max_age: expiry_seconds
       )
       |> put_resp_content_type("application/json")
-      |> send_resp(200, Jason.encode!(%{ok: true}))
+      |> send_resp(
+        200,
+        Jason.encode!(%{
+          ok: true,
+          expires_in: expiry_seconds
+        })
+      )
     else
       conn
       |> put_resp_content_type("application/json")
@@ -292,17 +445,16 @@ defmodule Mooncore.Dev.Plug do
     filter = String.trim(conn.query_params["filter"] || "")
 
     page =
-      conn.query_params["page"]
-      |> Kernel.||("1")
-      |> String.to_integer()
-      |> max(1)
+      case Integer.parse(conn.query_params["page"] || "1") do
+        {n, _} -> max(n, 1)
+        :error -> 1
+      end
 
     limit =
-      conn.query_params["limit"]
-      |> Kernel.||("50")
-      |> String.to_integer()
-      |> min(200)
-      |> max(1)
+      case Integer.parse(conn.query_params["limit"] || "50") do
+        {n, _} -> n |> min(200) |> max(1)
+        :error -> 50
+      end
 
     result =
       try do
@@ -546,13 +698,20 @@ defmodule Mooncore.Dev.Plug do
     conn = fetch_query_params(conn)
     qp = conn.query_params
 
+    parse_int = fn s ->
+      case s && Integer.parse(s) do
+        {n, _} -> n
+        _ -> nil
+      end
+    end
+
     opts =
       %{
-        "limit" => qp["limit"] && String.to_integer(qp["limit"]),
+        "limit" => parse_int.(qp["limit"]),
         "user" => qp["user"],
         "channel" => qp["channel"],
         "direction" => qp["direction"],
-        "since_id" => qp["since_id"] && String.to_integer(qp["since_id"])
+        "since_id" => parse_int.(qp["since_id"])
       }
       |> Enum.reject(fn {_, v} -> is_nil(v) end)
       |> Map.new()
@@ -755,29 +914,168 @@ defmodule Mooncore.Dev.Plug do
   end
 
   post "/api/devtools/eval" do
-    code = conn.body_params["code"] || ""
-    widget_id = conn.body_params["widget_id"]
-    item_json = conn.body_params["item"]
+    if not Mooncore.mooncore_dev_tools_enabled?() do
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(503, Jason.encode!(%{ok: false, error: "Dev tools not enabled"}))
+    else
+      code = conn.body_params["code"] || ""
+      _widget_id = conn.body_params["widget_id"]
+      item_json = conn.body_params["item"]
 
-    result =
-      try do
-        bindings =
-          if item_json do
-            item = Jason.decode!(item_json)
-            [{:item, item}]
-          else
-            []
-          end
+      result =
+        try do
+          bindings =
+            if item_json do
+              item = Jason.decode!(item_json)
+              [{:item, item}]
+            else
+              []
+            end
 
-        {result, _} = Code.eval_string(code, bindings)
-        %{ok: true, result: inspect(result)}
-      rescue
-        e -> %{ok: false, error: Exception.message(e)}
-      end
+          {result, _} = Code.eval_string(code, bindings)
+          %{ok: true, result: inspect(result)}
+        rescue
+          e -> %{ok: false, error: Exception.message(e)}
+        end
+
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(200, Jason.encode!(result))
+    end
+  end
+
+  # ── OAuth 2.0 Authorization Server (MCP 2025-03-26, RFC 8414 / RFC 7591 / RFC 6749) ──
+
+  get "/.well-known/oauth-protected-resource" do
+    base = oauth_server_base(conn)
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(200, Jason.encode!(result))
+    |> send_resp(200, Jason.encode!(%{resource: base, authorization_servers: [base]}))
+  end
+
+  get "/.well-known/oauth-authorization-server" do
+    base = oauth_server_base(conn)
+
+    meta = %{
+      issuer: base,
+      authorization_endpoint: "#{base}/oauth/authorize",
+      token_endpoint: "#{base}/oauth/token",
+      registration_endpoint: "#{base}/oauth/register",
+      response_types_supported: ["code"],
+      grant_types_supported: ["authorization_code"],
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: ["none"],
+      scopes_supported: ["mcp"]
+    }
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(meta))
+  end
+
+  # Dynamic Client Registration (RFC 7591) — no persistent storage needed for dev tools
+  post "/oauth/register" do
+    redirect_uris = conn.body_params["redirect_uris"] || []
+    client_name = conn.body_params["client_name"] || "MCP Client"
+
+    client_id =
+      :crypto.hash(:sha256, :erlang.term_to_binary({redirect_uris, client_name}))
+      |> Base.url_encode64(padding: false)
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(
+      201,
+      Jason.encode!(%{
+        client_id: client_id,
+        client_name: client_name,
+        redirect_uris: redirect_uris,
+        grant_types: ["authorization_code"],
+        response_types: ["code"],
+        token_endpoint_auth_method: "none"
+      })
+    )
+  end
+
+  get "/oauth/authorize" do
+    conn
+    |> put_resp_content_type("text/html")
+    |> send_resp(200, oauth_authorize_page(conn.query_params))
+  end
+
+  post "/oauth/authorize" do
+    secret = System.get_env("MOONCORE_DEV_SECRET") || ""
+    password = conn.body_params["password"] || ""
+    redirect_uri = conn.body_params["redirect_uri"] || ""
+    state = conn.body_params["state"] || ""
+    code_challenge = conn.body_params["code_challenge"] || ""
+
+    # Only allow redirect URIs that point to localhost, vscode callback, or the configured allowlist
+    allowed_uris = Mooncore.config(:oauth_redirect_uris, [])
+
+    safe_redirect? =
+      Enum.member?(allowed_uris, redirect_uri) or
+        case URI.parse(redirect_uri) do
+          %URI{scheme: "http", host: h} when h in ["localhost", "127.0.0.1", "::1"] -> true
+          %URI{scheme: "https"} -> true
+          %URI{scheme: "vscode", host: "vscode.dev"} -> true
+          _ -> false
+        end
+
+    if byte_size(secret) > 0 and byte_size(password) > 0 and
+         Plug.Crypto.secure_compare(password, secret) and safe_redirect? do
+      code = oauth_issue_auth_code(secret, code_challenge)
+      sep = if String.contains?(redirect_uri, "?"), do: "&", else: "?"
+
+      location =
+        "#{redirect_uri}#{sep}code=#{URI.encode_www_form(code)}&state=#{URI.encode_www_form(state)}"
+
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(200, Jason.encode!(%{location: location}))
+    else
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(401, Jason.encode!(%{error: "invalid_request"}))
+    end
+  end
+
+  post "/oauth/token" do
+    grant_type = conn.body_params["grant_type"] || ""
+    code = conn.body_params["code"] || ""
+    code_verifier = conn.body_params["code_verifier"]
+
+    if grant_type != "authorization_code" do
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(400, Jason.encode!(%{error: "unsupported_grant_type"}))
+    else
+      secret = System.get_env("MOONCORE_DEV_SECRET") || ""
+
+      case oauth_verify_auth_code(secret, code, code_verifier) do
+        {:ok, code_expiry} ->
+          {access_token, token_expiry} = oauth_issue_access_token(secret, code_expiry)
+          expires_in = token_expiry - System.system_time(:second)
+
+          conn
+          |> put_resp_content_type("application/json")
+          |> send_resp(
+            200,
+            Jason.encode!(%{
+              access_token: access_token,
+              token_type: "Bearer",
+              expires_in: expires_in
+            })
+          )
+
+        {:error, reason} ->
+          conn
+          |> put_resp_content_type("application/json")
+          |> send_resp(400, Jason.encode!(%{error: reason}))
+      end
+    end
   end
 
   match _ do
@@ -785,36 +1083,106 @@ defmodule Mooncore.Dev.Plug do
   end
 
   defp check_dev_auth(conn, _opts) do
-    secret = System.get_env("MOONCORE_DEV_SECRET")
+    # OAuth discovery and token endpoints are public — they handle their own auth
+    oauth_path? =
+      String.starts_with?(conn.request_path, "/.well-known/") or
+        String.starts_with?(conn.request_path, "/oauth/")
 
-    if is_binary(secret) and byte_size(secret) > 0 do
-      conn = fetch_cookies(conn)
-      token = dev_session_token(secret)
-      header_val = get_req_header(conn, "x-dev-secret") |> List.first()
-      authed = header_val == secret or conn.cookies["mooncore_dev"] == token
+    if oauth_path? do
+      conn
+    else
+      secret = System.get_env("MOONCORE_DEV_SECRET")
 
-      if authed or conn.request_path == "/dev/login" do
-        conn
+      if is_binary(secret) and byte_size(secret) > 0 do
+        conn = fetch_cookies(conn)
+        auth_header = get_req_header(conn, "authorization") |> List.first()
+        header_val = get_req_header(conn, "x-dev-secret") |> List.first()
+
+        authed =
+          cond do
+            # x-dev-secret: <raw secret> — for scripts and local automation
+            is_binary(header_val) ->
+              Plug.Crypto.secure_compare(header_val, secret)
+
+            # OAuth Bearer token — for VS Code MCP and API clients
+            is_binary(auth_header) and String.starts_with?(auth_header, "Bearer ") ->
+              bearer = String.slice(auth_header, 7, String.length(auth_header))
+              oauth_verify_access_token(secret, bearer)
+
+            # Cookie — for browser dashboard
+            true ->
+              cookie_token = conn.cookies["mooncore_dev"]
+              cookie_exp = conn.cookies["mooncore_dev_exp"]
+
+              exp_ts =
+                case cookie_exp do
+                  s when is_binary(s) ->
+                    case Integer.parse(s) do
+                      {ts, ""} -> ts
+                      _ -> nil
+                    end
+
+                  _ ->
+                    nil
+                end
+
+              expected_token = exp_ts && dev_session_token(secret, exp_ts)
+
+              is_binary(cookie_token) and is_binary(expected_token) and
+                Plug.Crypto.secure_compare(cookie_token, expected_token) and
+                System.system_time(:second) <= exp_ts
+          end
+
+        if authed or conn.request_path == "/dev/login" do
+          conn
+        else
+          resource_meta = "#{oauth_server_base(conn)}/.well-known/oauth-protected-resource"
+          www_auth = "Bearer realm=\"Mooncore DevTools\", resource_metadata=\"#{resource_meta}\""
+
+          if String.starts_with?(conn.request_path, "/api/") or conn.request_path == "/mcp" do
+            conn
+            |> put_resp_header("www-authenticate", www_auth)
+            |> put_resp_content_type("application/json")
+            |> send_resp(
+              401,
+              Jason.encode!(%{
+                error: "unauthorized",
+                message: "Authenticate via OAuth (MCP), x-dev-secret header, or browser cookie."
+              })
+            )
+            |> halt()
+          else
+            conn
+            |> put_resp_content_type("text/html")
+            |> send_resp(200, dev_login_page())
+            |> halt()
+          end
+        end
       else
-        if String.starts_with?(conn.request_path, "/api/") or conn.request_path == "/mcp" do
+        # No secret configured — reject API/protocol endpoints
+        if conn.request_path == "/mcp" or String.starts_with?(conn.request_path, "/api/") do
           conn
           |> put_resp_content_type("application/json")
-          |> send_resp(401, Jason.encode!(%{error: "unauthorized"}))
+          |> send_resp(
+            401,
+            Jason.encode!(%{
+              error: "unauthorized",
+              message:
+                "MOONCORE_DEV_SECRET is not configured — dev tools authentication is required."
+            })
+          )
           |> halt()
         else
           conn
-          |> put_resp_content_type("text/html")
-          |> send_resp(200, dev_login_page())
-          |> halt()
         end
       end
-    else
-      conn
     end
   end
 
-  defp dev_session_token(secret) do
-    :crypto.mac(:hmac, :sha256, secret, "mooncore-dev-session")
+  # ── Dev Session Token ──
+  # Expiry-bound HMAC token used for browser cookie auth
+  defp dev_session_token(secret, expiry_ts) do
+    :crypto.mac(:hmac, :sha256, secret <> Integer.to_string(expiry_ts), "mooncore-dev-session")
     |> Base.url_encode64(padding: false)
   end
 
@@ -831,41 +1199,63 @@ defmodule Mooncore.Dev.Plug do
         body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif;
                display: flex; align-items: center; justify-content: center; min-height: 100vh; }
         .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
-                padding: 2rem; width: 100%; max-width: 360px; }
+                padding: 2rem; width: 100%; max-width: 420px; }
         h1 { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.25rem; }
         p { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1.5rem; }
         code { background: #0f172a; padding: 1px 5px; border-radius: 4px; font-size: 0.8rem; }
-        input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px;
-                padding: 0.6rem 0.75rem; color: #e2e8f0; font-size: 0.95rem; outline: none; }
-        input:focus { border-color: #6366f1; }
+        .field { margin-bottom: 0.75rem; }
+        label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.35rem; }
+        select, input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+                padding: 0.6rem 0.75rem; color: #e2e8f0; font-size: 0.9rem; outline: none; }
+        select:focus, input:focus { border-color: #6366f1; }
         button { margin-top: 0.75rem; width: 100%; background: #6366f1; color: white;
                  border: none; border-radius: 6px; padding: 0.65rem; font-size: 0.95rem;
                  cursor: pointer; font-weight: 500; }
         button:hover { background: #4f46e5; }
-        .error { margin-top: 0.75rem; color: #f87171; font-size: 0.85rem; display: none; }
+        .error { margin-top: 0.5rem; color: #f87171; font-size: 0.85rem; display: none; }
       </style>
     </head>
     <body>
       <div class="card">
         <h1>Mooncore DevTools</h1>
         <p>Enter the <code>MOONCORE_DEV_SECRET</code> to continue.</p>
-        <input type="password" id="pw" placeholder="Secret" autofocus>
+
+        <div class="field">
+          <label for="pw">Secret</label>
+          <input type="password" id="pw" placeholder="Enter secret" autofocus>
+        </div>
+
+        <div class="field">
+          <label for="expiry">Token expiry</label>
+          <select id="expiry">
+            <option value="1h">1 hour</option>
+            <option value="8h">8 hour</option>
+            <option value="1d">1 day</option>
+            <option value="1w" selected>1 week</option>
+            <option value="1m">1 month</option>
+          </select>
+        </div>
+
         <button onclick="login()">Unlock</button>
         <div class="error" id="err">Incorrect secret.</div>
       </div>
+
       <script>
         document.getElementById('pw').addEventListener('keydown', e => {
           if (e.key === 'Enter') login();
         });
         async function login() {
           const pw = document.getElementById('pw').value;
+          const expiry = document.getElementById('expiry').value;
           const res = await fetch('/dev/login', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({password: pw})
+            body: JSON.stringify({password: pw, expiry: expiry})
           });
+          const data = await res.json();
           if (res.ok) {
-            location.href = '/';
+            // Redirect to dashboard after successful login
+            window.location.href = '/';
           } else {
             document.getElementById('err').style.display = 'block';
             document.getElementById('pw').select();
@@ -1316,7 +1706,7 @@ defmodule Mooncore.Dev.Plug do
   defp decode_ets_table_id(encoded) when is_binary(encoded) do
     encoded
     |> Base.url_decode64!(padding: false)
-    |> :erlang.binary_to_term()
+    |> :erlang.binary_to_term([:safe])
   end
 
   defp process_current_function(pid) do
@@ -1324,5 +1714,186 @@ defmodule Mooncore.Dev.Plug do
       {:current_function, {mod, fun, arity}} -> "#{inspect(mod)}.#{fun}/#{arity}"
       _ -> nil
     end
+  end
+
+  # ── OAuth 2.0 Helpers ──
+
+  defp oauth_server_base(conn) do
+    %URI{scheme: s, host: h, port: p} = conn |> request_url() |> URI.parse()
+    default_port = if s == "https", do: 443, else: 80
+    if p == default_port, do: "#{s}://#{h}", else: "#{s}://#{h}:#{p}"
+  end
+
+  # Auth code format: "#{expiry}.#{code_challenge}.#{hmac}"
+  # code_challenge and hmac are base64url (no dots), expiry is an integer — safe to split on "."
+  defp oauth_issue_auth_code(secret, code_challenge) do
+    expiry = System.system_time(:second) + 300
+    payload = "#{expiry}.#{code_challenge}"
+
+    hmac =
+      :crypto.mac(:hmac, :sha256, secret, "mooncore-oauth-code.#{payload}")
+      |> Base.url_encode64(padding: false)
+
+    "#{payload}.#{hmac}"
+  end
+
+  defp oauth_verify_auth_code(secret, code, code_verifier) do
+    case String.split(code, ".", parts: 3) do
+      [expiry_str, code_challenge, hmac] ->
+        expiry = String.to_integer(expiry_str)
+        now = System.system_time(:second)
+        payload = "#{expiry_str}.#{code_challenge}"
+
+        expected_hmac =
+          :crypto.mac(:hmac, :sha256, secret, "mooncore-oauth-code.#{payload}")
+          |> Base.url_encode64(padding: false)
+
+        cond do
+          not Plug.Crypto.secure_compare(hmac, expected_hmac) ->
+            {:error, "invalid_grant"}
+
+          now > expiry ->
+            {:error, "invalid_grant"}
+
+          is_binary(code_verifier) ->
+            expected_challenge =
+              :crypto.hash(:sha256, code_verifier)
+              |> Base.url_encode64(padding: false)
+
+            if Plug.Crypto.secure_compare(expected_challenge, code_challenge),
+              do: {:ok, expiry},
+              else: {:error, "invalid_grant"}
+
+          true ->
+            {:ok, expiry}
+        end
+
+      _ ->
+        {:error, "invalid_grant"}
+    end
+  end
+
+  # Access token format: "#{expiry}.#{hmac}"
+  defp oauth_issue_access_token(secret, _code_expiry) do
+    expiry = System.system_time(:second) + 3600
+
+    hmac =
+      :crypto.mac(:hmac, :sha256, secret, "mooncore-oauth-token.#{expiry}")
+      |> Base.url_encode64(padding: false)
+
+    {"#{expiry}.#{hmac}", expiry}
+  end
+
+  defp oauth_verify_access_token(secret, token) do
+    case String.split(token, ".", parts: 2) do
+      [expiry_str, hmac] ->
+        with {expiry, ""} <- Integer.parse(expiry_str),
+             expected_hmac =
+               :crypto.mac(:hmac, :sha256, secret, "mooncore-oauth-token.#{expiry_str}")
+               |> Base.url_encode64(padding: false),
+             true <- Plug.Crypto.secure_compare(hmac, expected_hmac),
+             true <- System.system_time(:second) <= expiry do
+          true
+        else
+          _ -> false
+        end
+
+      _ ->
+        false
+    end
+  end
+
+  defp oauth_authorize_page(params) do
+    redirect_uri = params["redirect_uri"] || ""
+    state = params["state"] || ""
+    client_id = params["client_id"] || ""
+    code_challenge = params["code_challenge"] || ""
+    code_challenge_method = params["code_challenge_method"] || "S256"
+    scope = params["scope"] || "mcp"
+
+    client_display =
+      case URI.parse(redirect_uri) do
+        %URI{host: h} when is_binary(h) and h != "" -> h
+        _ -> redirect_uri
+      end
+
+    """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Authorize - Mooncore DevTools</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif;
+               display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+                padding: 2rem; width: 100%; max-width: 420px; }
+        h1 { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.25rem; }
+        p { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem; }
+        code { background: #0f172a; padding: 1px 5px; border-radius: 4px; font-size: 0.8rem; }
+        .client-box { background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+                      padding: 0.6rem 0.75rem; margin-bottom: 1.25rem; font-size: 0.85rem;
+                      color: #94a3b8; word-break: break-all; }
+        .client-box strong { color: #e2e8f0; }
+        .field { margin-bottom: 0.75rem; }
+        label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.35rem; }
+        input { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+                padding: 0.6rem 0.75rem; color: #e2e8f0; font-size: 0.9rem; outline: none; }
+        input:focus { border-color: #6366f1; }
+        button { margin-top: 0.75rem; width: 100%; background: #6366f1; color: white;
+                 border: none; border-radius: 6px; padding: 0.65rem; font-size: 0.95rem;
+                 cursor: pointer; font-weight: 500; }
+        button:hover { background: #4f46e5; }
+        .error { margin-top: 0.5rem; color: #f87171; font-size: 0.85rem; display: none; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>Authorize Access</h1>
+        <p>An MCP client is requesting access to Mooncore DevTools.</p>
+        <div class="client-box">
+          Client: <strong id="client-display"></strong>
+        </div>
+        <div class="field">
+          <label for="pw">MOONCORE_DEV_SECRET</label>
+          <input type="password" id="pw" placeholder="Enter secret" autofocus>
+        </div>
+        <button onclick="authorize()">Authorize</button>
+        <div class="error" id="err">Incorrect secret.</div>
+      </div>
+      <script>
+        const OAUTH = {
+          redirect_uri: #{Jason.encode!(redirect_uri)},
+          state: #{Jason.encode!(state)},
+          client_id: #{Jason.encode!(client_id)},
+          code_challenge: #{Jason.encode!(code_challenge)},
+          code_challenge_method: #{Jason.encode!(code_challenge_method)},
+          scope: #{Jason.encode!(scope)}
+        };
+        document.getElementById('client-display').textContent = #{Jason.encode!(client_display)};
+        async function authorize() {
+          const pw = document.getElementById('pw').value;
+          const res = await fetch('/oauth/authorize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: pw, ...OAUTH})
+          });
+          const data = await res.json();
+          if (res.ok && data.location) {
+            window.location.href = data.location;
+          } else {
+            document.getElementById('err').style.display = 'block';
+            document.getElementById('pw').select();
+          }
+        }
+        document.getElementById('pw').addEventListener('keydown', e => {
+          if (e.key === 'Enter') authorize();
+        });
+      </script>
+    </body>
+    </html>
+    """
   end
 end

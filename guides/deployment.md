@@ -93,13 +93,13 @@ CMD ["bin/my_app", "start"]
 
 ## Environment Variables
 
-| Variable             | Description                                                                 |
-| -------------------- | --------------------------------------------------------------------------- |
-| `PORT`               | HTTP listening port                                                         |
-| `JWT_PRIVATE_KEY`    | RSA private key PEM for JWT signing                                         |
-| `JWT_ISSUER`         | JWT issuer claim                                                            |
-| `SECRET_KEY_BASE`    | For cookie signing if you use Plug sessions                                 |
-| `MOONCORE_DEV_TOOLS` | Must be `"true"` to enable dev tools (used with `mooncore_dev_tools: true`) |
+| Variable              | Description                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| `PORT`                | HTTP listening port                                                                            |
+| `JWT_PRIVATE_KEY`     | RSA private key PEM for JWT signing                                                            |
+| `JWT_ISSUER`          | JWT issuer claim                                                                               |
+| `SECRET_KEY_BASE`     | For cookie signing if you use Plug sessions                                                    |
+| `MOONCORE_DEV_SECRET` | Password for dev dashboard login. Also accepted as `x-dev-secret` query param for MCP clients. |
 
 ### Why Two Gates?
 
@@ -135,6 +135,7 @@ end
 ## Production Checklist
 
 - [ ] `mooncore_dev_tools: false` — never expose dev tools in production
+- [ ] `dev_tools_allowed_ips` restricts dev tools to known IPs (if dev tools are enabled)
 - [ ] JWT private key loaded from environment variable, not committed to repo
 - [ ] CORS origins restricted to your domains (not `["*"]`)
 - [ ] Plug.Logger or custom logging configured

@@ -6,35 +6,41 @@ Mooncore includes a built-in development dashboard for real-time observability o
 
 ## Enabling Dev Mode
 
-Dev tools require **two gates** to be open:
+Dev tools require two things:
 
-1. **Config gate** — `mooncore_dev_tools: true` in your application config
-2. **Environment gate** — `MOONCORE_DEV_TOOLS=true` environment variable
+1. **Config flag** — `mooncore_dev_tools: true` in your application config
+2. **Secret** — `MOONCORE_DEV_SECRET` environment variable set to a non-empty value
 
-Both must be set. This two-gate system ensures dev tools can't accidentally be enabled in production through a misconfigured config file alone.
+The secret is mandatory: it protects the dashboard and MCP server. Without it the dev server won't start, even if the config flag is set.
 
 ```elixir
 # config/dev.exs
 config :mooncore,
   mooncore_dev_tools: true,
-  mcp_port: 4040   # default, can be changed
+  mcp_port: 4040,                # default, can be changed
+  dev_tools_allowed_ips: [        # optional IP allowlist
+    "127.0.0.1",
+    "::1",
+    "10.0.0.0/8"
+  ]
 ```
 
+> **IP Allowlist:** If `dev_tools_allowed_ips` is set, only requests from matching IPs are accepted (403 Forbidden otherwise). Supports plain IPs (`"127.0.0.1"`) and CIDR ranges (`"10.0.0.0/8"`). If unset or empty, all IPs are allowed (default behaviour — backwards compatible).
+
 ```bash
-# Set the environment variable before starting the app
-export MOONCORE_DEV_TOOLS=true
+export MOONCORE_DEV_SECRET=your-secret-here
 mix run --no-halt
 ```
 
 Or inline:
 
 ```bash
-MOONCORE_DEV_TOOLS=true mix run --no-halt
+MOONCORE_DEV_SECRET=your-secret mix run --no-halt
 ```
 
-When both gates are open, a dedicated HTTP server starts on `mcp_port` (default 4040). Open `http://localhost:4040/` in your browser.
+When both are configured, a dedicated HTTP server starts on `mcp_port` (default 4040). Open `http://localhost:4040/` in your browser.
 
-When either gate is closed, nothing dev-related starts — no server, no watcher, no overhead.
+When either is missing, nothing dev-related starts — no server, no watcher, no overhead.
 
 ## Dashboard Screens
 

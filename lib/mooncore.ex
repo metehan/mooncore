@@ -15,6 +15,9 @@ defmodule Mooncore do
         app_module: MyApp.App,
         jwt: [key: "...", issuer: "myapp"],
         pools: [:default],
+        mooncore_dev_tools: true,   # also requires MOONCORE_DEV_SECRET env var
+        dev_tools_allowed_ips: ["127.0.0.1", "10.0.0.0/8"],
+        oauth_redirect_uris: [],    # extra OAuth redirect URI allowlist (localhost/https always allowed)
         before_action: [],
         after_action: []
   """
@@ -40,12 +43,24 @@ defmodule Mooncore do
 
   Requires BOTH:
   - `config :mooncore, mooncore_dev_tools: true`
-  - `MOONCORE_DEV_TOOLS=true` environment variable
+  - `MOONCORE_DEV_SECRET` environment variable set to a non-empty value
 
-  This two-gate system prevents accidental exposure of dev tools
-  when deploying to a server with a misconfigured config.
+  This prevents accidental exposure of dev tools on servers where
+  the config flag is present but no secret is configured.
   """
   def mooncore_dev_tools_enabled? do
-    config(:mooncore_dev_tools, false) == true and System.get_env("MOONCORE_DEV_TOOLS") == "true"
+    secret = System.get_env("MOONCORE_DEV_SECRET")
+    config(:mooncore_dev_tools, false) == true and is_binary(secret) and byte_size(secret) > 0
   end
+
+  @doc """
+  Get allowed dev tool IPs.
+
+  Returns the list from `config :mooncore, dev_tools_allowed_ips`.
+  If not configured, all IPs are allowed (returns `nil` — used as "allow all" sentinel).
+
+  Supports plain IPs (`"127.0.0.1"`, `"::1"`) and CIDR ranges
+  (`"192.168.1.0/24"`, `"10.0.0.0/8"`).
+  """
+  def dev_tools_allowed_ips, do: config(:dev_tools_allowed_ips, nil)
 end

@@ -62,16 +62,17 @@ config :mooncore,
 
 ### Configuration Keys
 
-| Key                  | Type    | Description                                                                            |
-| -------------------- | ------- | -------------------------------------------------------------------------------------- |
-| `port`               | integer | HTTP listening port (default: 4000)                                                    |
-| `router`             | module  | Your Plug.Router module                                                                |
-| `app_module`         | module  | Your App registry module                                                               |
-| `jwt`                | keyword | `[key: "RSA private key PEM", issuer: "name"]`                                         |
-| `pools`              | list    | Named client pool atoms (default: `[:default]`)                                        |
-| `before_action`      | list    | Middleware modules run before actions                                                  |
-| `after_action`       | list    | Middleware modules run after actions                                                   |
-| `mooncore_dev_tools` | boolean | Enables dev dashboard and MCP server (also requires `MOONCORE_DEV_TOOLS=true` env var) |
+| Key                     | Type    | Description                                                                                 |
+| ----------------------- | ------- | ------------------------------------------------------------------------------------------- |
+| `port`                  | integer | HTTP listening port (default: 4000)                                                         |
+| `router`                | module  | Your Plug.Router module                                                                     |
+| `app_module`            | module  | Your App registry module                                                                    |
+| `jwt`                   | keyword | `[key: "RSA private key PEM", issuer: "name"]`                                              |
+| `pools`                 | list    | Named client pool atoms (default: `[:default]`)                                             |
+| `before_action`         | list    | Middleware modules run before actions                                                       |
+| `after_action`          | list    | Middleware modules run after actions                                                        |
+| `mooncore_dev_tools`    | boolean | Enables dev dashboard and MCP server (also requires `MOONCORE_DEV_SECRET` env var)          |
+| `dev_tools_allowed_ips` | list    | IP allowlist for dev tools (e.g. `["127.0.0.1", "10.0.0.0/8"]`). If unset, all IPs allowed. |
 
 ## Step 1: Define Your App
 

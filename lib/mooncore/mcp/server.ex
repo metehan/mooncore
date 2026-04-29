@@ -25,6 +25,22 @@ defmodule Mooncore.MCP.Server do
 
   defp mooncore_dev_tools?, do: Mooncore.mooncore_dev_tools_enabled?()
 
+  defp dev_tools_disabled do
+    %{
+      ok: """
+      Dev tools are not active. To enable MCP:
+
+      1. Add to your config:
+           config :mooncore, mooncore_dev_tools: true, mcp_port: 4040
+
+      2. Set the environment variable before starting the app:
+           MOONCORE_DEV_SECRET=<your-secret>
+
+      Both the config flag and the environment variable must be set.
+      """
+    }
+  end
+
   # ── Read-only resources ──
 
   @doc "List all registered actions across all apps. Requires mooncore_dev_tools."
@@ -208,7 +224,7 @@ defmodule Mooncore.MCP.Server do
   """
   def run_action(action, params \\ %{}, auth \\ nil) do
     if not Mooncore.mooncore_dev_tools_enabled?() do
-      %{error: "run_action requires mooncore_dev_tools"}
+      dev_tools_disabled()
     else
       request = %{
         params: Map.put(params, "action", action),
@@ -229,7 +245,7 @@ defmodule Mooncore.MCP.Server do
   @doc "Add a log watcher. Returns a reference for reading. mooncore_dev_tools only."
   def add_watcher_session(tag_filter \\ nil) do
     if not Mooncore.mooncore_dev_tools_enabled?() do
-      %{error: "requires mooncore_dev_tools"}
+      dev_tools_disabled()
     else
       Watcher.add_watcher(self(), tag_filter)
       %{ok: true, message: "Watcher added for pid #{inspect(self())}"}
@@ -330,7 +346,7 @@ defmodule Mooncore.MCP.Server do
   """
   def eval_code(code) when is_binary(code) do
     if not Mooncore.mooncore_dev_tools_enabled?() do
-      %{error: "eval requires mooncore_dev_tools"}
+      dev_tools_disabled()
     else
       try do
         {result, _bindings} = Code.eval_string(code)
@@ -351,7 +367,7 @@ defmodule Mooncore.MCP.Server do
   """
   def handle_request(params) do
     if not mooncore_dev_tools?() do
-      %{error: "MCP server requires mooncore_dev_tools"}
+      dev_tools_disabled()
     else
       do_handle_request(params)
     end
