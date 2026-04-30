@@ -625,6 +625,10 @@ defmodule Mooncore.Dev.Plug do
 
     topology = supervisor_topology_snapshot()
 
+    # Dev tools allowlist info (frontend uses this to show warnings)
+    allowed_ips = Mooncore.dev_tools_allowed_ips()
+    allowlist_set = not (is_nil(allowed_ips) or allowed_ips == [])
+
     data = %{
       memory: memory,
       schedulers: sched,
@@ -633,6 +637,8 @@ defmodule Mooncore.Dev.Plug do
       ets_tables: ets_tables,
       applications: apps,
       topology: topology,
+      dev_tools_allowed_ips: allowed_ips,
+      dev_tools_allowlist_set: allowlist_set,
       timestamp: System.system_time(:millisecond)
     }
 
