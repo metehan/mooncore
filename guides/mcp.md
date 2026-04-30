@@ -2,11 +2,11 @@
 
 Mooncore includes a built-in [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that exposes your application's internals to AI tools, IDE extensions, and custom integrations. It implements the **Streamable HTTP** transport with JSON-RPC 2.0.
 
-> **Security:** The MCP server provides full access to action execution, code evaluation, and log inspection. Never enable mooncore_dev_tools in production.
+> **Security:** The MCP server provides full access to action execution, code evaluation, and log inspection. Never enable `mooncore_dev_tools` in production.
 
 ## Setup
 
-Enable mooncore_dev_tools in your config:
+Enable `mooncore_dev_tools` in your config:
 
 ```elixir
 config :mooncore,
@@ -14,7 +14,11 @@ config :mooncore,
   mcp_port: 4040   # default
 ```
 
-Also set `MOONCORE_DEV_TOOLS=true` environment variable on your system. 
+Also set `MOONCORE_DEV_SECRET` before starting the app:
+
+```bash
+export MOONCORE_DEV_SECRET=your-secret-here
+```
 
 The MCP endpoint is available at `http://localhost:4040/mcp` when the server is running.
 
@@ -221,7 +225,6 @@ Current server configuration (sanitized).
   "pools": ["default"],
   "router": "MyApp.Router",
   "app_module": "MyApp.App",
-  "mooncore_dev_tools": true,
   "watcher_count": 0,
   "log_count": 15
 }
@@ -314,7 +317,7 @@ Mooncore.MCP.Watcher.log(:db, %{query: "FOR t IN tasks RETURN t", time_ms: 12})
 Mooncore.MCP.Watcher.log(:error, %{action: "task.create", reason: "validation failed"})
 ```
 
-The `:action` tag is used automatically by the action pipeline when mooncore_dev_tools is enabled, logging every action execution with params, auth, response, duration, and source (http/ws).
+The `:action` tag is used automatically by the action pipeline when dev tools are enabled, logging every action execution with params, auth, response, duration, and source (http/ws).
 
 ### Reading Logs
 
@@ -375,4 +378,4 @@ Mooncore.MCP.Server.clear_logs()
 Mooncore.MCP.Server.add_watcher_session(:action)
 ```
 
-All functions require `config :mooncore, mooncore_dev_tools: true` and will return errors or throw when mooncore_dev_tools is off.
+All functions require `config :mooncore, mooncore_dev_tools: true` and `MOONCORE_DEV_SECRET` to be set, and will return errors or throw when dev tools are off.

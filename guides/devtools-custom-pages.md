@@ -39,13 +39,9 @@ A system for apps to create custom dashboard pages with widgets backed by ETS da
 
 ### 1. Enable Devtools
 
-Custom pages only run when devtools are enabled:
+Custom pages only run when devtools are enabled — i.e. when both `config :mooncore, mooncore_dev_tools: true` is set and `MOONCORE_DEV_SECRET` is set.
 
-```elixir
-# config :mooncore, mooncore_dev_tools: true
-```
-
-Set `MOONCORE_DEV_TOOLS=true` as an environment variable as an alternative to the config flag. When disabled, `Devtools` GenServer won't start and page registration calls become no-ops — so it's safe to leave the setup code in your app.
+When either is missing, `Devtools` GenServer won't start and page registration calls become no-ops — so it's safe to leave the setup code in your app.
 
 ### 2. Define a Page
 

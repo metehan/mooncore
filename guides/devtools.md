@@ -2,7 +2,7 @@
 
 Mooncore includes a built-in development dashboard for real-time observability of your running application. The dashboard is a full-featured single-page app with live VM metrics, action execution, developer tools, and more.
 
-> **Security:** Never enable mooncore_dev_tools in production. The dashboard provides full access to eval, action execution, and file system browsing.
+> **Security:** Never enable `mooncore_dev_tools` in production. The dashboard provides full access to eval, action execution, and file system browsing.
 
 ## Enabling Dev Mode
 

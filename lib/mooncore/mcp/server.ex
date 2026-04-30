@@ -2,9 +2,7 @@ defmodule Mooncore.MCP.Server do
   @moduledoc """
   MCP (Model Context Protocol) server for AI observability.
 
-  **Everything is gated behind mooncore_dev_tools.** Nothing is exposed when mooncore_dev_tools is off.
-
-      config :mooncore, mooncore_dev_tools: true
+  Everything is gated behind `MOONCORE_DEV_SECRET`. Nothing is exposed when the secret is not set.
 
   ## Resources (read-only)
   - `actions` — list all registered actions across all apps
@@ -43,7 +41,7 @@ defmodule Mooncore.MCP.Server do
 
   # ── Read-only resources ──
 
-  @doc "List all registered actions across all apps. Requires mooncore_dev_tools."
+  @doc "List all registered actions across all apps. Requires MOONCORE_DEV_SECRET."
   def list_actions do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
@@ -153,7 +151,7 @@ defmodule Mooncore.MCP.Server do
 
   defp normalize_rules(other), do: other
 
-  @doc "Get connected client counts for a pool. Requires mooncore_dev_tools."
+  @doc "Get connected client counts for a pool. Requires MOONCORE_DEV_SECRET."
   def list_clients(pool \\ nil) do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
@@ -180,7 +178,7 @@ defmodule Mooncore.MCP.Server do
     end)
   end
 
-  @doc "Get all registered apps (sanitized — no sensitive data). Requires mooncore_dev_tools."
+  @doc "Get all registered apps (sanitized — no sensitive data). Requires MOONCORE_DEV_SECRET."
   def list_apps do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
@@ -195,7 +193,7 @@ defmodule Mooncore.MCP.Server do
     end)
   end
 
-  @doc "Get current server configuration (sanitized). Requires mooncore_dev_tools."
+  @doc "Get current server configuration (sanitized). Requires MOONCORE_DEV_SECRET."
   def server_info do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
@@ -204,7 +202,6 @@ defmodule Mooncore.MCP.Server do
       pools: Mooncore.config(:pools, [:default]),
       router: inspect(Mooncore.config(:router)),
       app_module: inspect(Mooncore.config(:app_module)),
-      mooncore_dev_tools: Mooncore.config(:mooncore_dev_tools, false),
       before_action: inspect(Mooncore.config(:before_action, [])),
       after_action: inspect(Mooncore.config(:after_action, [])),
       watcher_count: Watcher.watcher_count(),
@@ -212,10 +209,10 @@ defmodule Mooncore.MCP.Server do
     }
   end
 
-  # ── Tools (mooncore_dev_tools) ──
+  # ── Tools ──
 
   @doc """
-  Run an action through the full pipeline. mooncore_dev_tools only.
+  Run an action through the full pipeline. Requires MOONCORE_DEV_SECRET.
 
   ## Params
   - `action` — action name string
@@ -242,7 +239,7 @@ defmodule Mooncore.MCP.Server do
     end
   end
 
-  @doc "Add a log watcher. Returns a reference for reading. mooncore_dev_tools only."
+  @doc "Add a log watcher. Returns a reference for reading. Requires MOONCORE_DEV_SECRET."
   def add_watcher_session(tag_filter \\ nil) do
     if not Mooncore.mooncore_dev_tools_enabled?() do
       dev_tools_disabled()
@@ -252,7 +249,7 @@ defmodule Mooncore.MCP.Server do
     end
   end
 
-  @doc "Read logs. Optional tag filter or since_id. Requires mooncore_dev_tools."
+  @doc "Read logs. Optional tag filter or since_id. Requires MOONCORE_DEV_SECRET."
   def read_logs(opts \\ %{}) do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
 
@@ -263,7 +260,7 @@ defmodule Mooncore.MCP.Server do
     end
   end
 
-  @doc "Clear all collected logs. Requires mooncore_dev_tools."
+  @doc "Clear all collected logs. Requires MOONCORE_DEV_SECRET."
   def clear_logs do
     if not mooncore_dev_tools?(), do: throw(:mooncore_dev_tools_required)
     Watcher.clear()
@@ -271,7 +268,7 @@ defmodule Mooncore.MCP.Server do
   end
 
   @doc """
-  Publish a WebSocket message to connected clients. Requires mooncore_dev_tools.
+  Publish a WebSocket message to connected clients. Requires MOONCORE_DEV_SECRET.
 
   ## Params
   - `group` — the dkey/group to target (required)
@@ -296,7 +293,7 @@ defmodule Mooncore.MCP.Server do
   end
 
   @doc """
-  Read WebSocket message logs with optional filters. Requires mooncore_dev_tools.
+  Read WebSocket message logs with optional filters. Requires MOONCORE_DEV_SECRET.
 
   ## Options
   - `limit` — max entries (default 100, max 1000)

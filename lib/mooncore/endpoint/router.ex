@@ -33,7 +33,7 @@ defmodule Mooncore.Endpoint.Router do
           |> halt()
         end
 
-        # Dev dashboard (only active when mooncore_dev_tools: true)
+        # Dev dashboard (only active when MOONCORE_DEV_SECRET is set)
         forward "/mooncore", to: Mooncore.Dev.Plug
 
         # Custom routes — you control everything

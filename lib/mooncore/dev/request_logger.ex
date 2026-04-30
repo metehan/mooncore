@@ -6,7 +6,7 @@ defmodule Mooncore.Dev.RequestLogger do
   regardless of transport (HTTP, WebSocket, MCP runner).
 
   Logs are stored in `Mooncore.MCP.Watcher` with tag `:action`.
-  Only logs when `config :mooncore, mooncore_dev_tools: true`.
+  Only logs when `MOONCORE_DEV_SECRET` is set.
   """
 
   @doc """

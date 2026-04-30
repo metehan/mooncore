@@ -40,7 +40,7 @@ defmodule Mooncore.MCP.Watcher do
     {:ok, %{logs: [], watchers: [], max: @max_logs}}
   end
 
-  @doc "Log an event with a tag. Only stores if mooncore_dev_tools is on."
+  @doc "Log an event with a tag. Only stores if MOONCORE_DEV_SECRET is set."
   def log(tag, data) do
     if Mooncore.mooncore_dev_tools_enabled?() and Process.whereis(__MODULE__) do
       GenServer.cast(__MODULE__, {:log, tag, data})

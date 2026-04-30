@@ -103,7 +103,7 @@ CMD ["bin/my_app", "start"]
 
 ### Why Two Gates?
 
-Dev tools require both `config :mooncore, mooncore_dev_tools: true` AND `MOONCORE_DEV_TOOLS=true`. This prevents accidental exposure in production — even if a config file is misconfigured or copied from dev, the environment variable acts as a second safety gate. The config says "this environment is allowed to have dev tools" and the env var says "this specific deployment instance has dev tools turned on."
+Dev tools require both `config :mooncore, mooncore_dev_tools: true` AND `MOONCORE_DEV_SECRET` set to a non-empty value. This prevents accidental exposure in production — even if a config file is misconfigured or copied from dev, the environment variable acts as a second safety gate. The config says "this environment is allowed to have dev tools" and the secret says "this specific deployment instance has dev tools turned on."
 
 ## Health Checks
 

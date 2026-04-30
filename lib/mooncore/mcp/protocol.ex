@@ -3,7 +3,7 @@ defmodule Mooncore.MCP.Protocol do
   Standard MCP (Model Context Protocol) JSON-RPC 2.0 handler.
 
   Implements the Streamable HTTP transport for VS Code and other MCP clients.
-  All operations require mooncore_dev_tools to be enabled.
+  All operations require `MOONCORE_DEV_SECRET` to be set.
 
   ## Supported Methods
 
@@ -147,25 +147,38 @@ defmodule Mooncore.MCP.Protocol do
         inputSchema: %{
           type: "object",
           properties: %{
-            pool: %{type: "string", description: "Pool name to query (default: all configured pools)"}
+            pool: %{
+              type: "string",
+              description: "Pool name to query (default: all configured pools)"
+            }
           }
         }
       },
       %{
         name: "read_socket_logs",
-        description: "Read WebSocket message logs (incoming, outgoing, and server-publish events)",
+        description:
+          "Read WebSocket message logs (incoming, outgoing, and server-publish events)",
         inputSchema: %{
           type: "object",
           properties: %{
-            limit: %{type: "integer", description: "Max entries to return (default 100, max 1000)"},
+            limit: %{
+              type: "integer",
+              description: "Max entries to return (default 100, max 1000)"
+            },
             user: %{type: "string", description: "Filter by username"},
-            channel: %{type: "string", description: "Filter by channel name (e.g. '@alice', 'main:default')"},
+            channel: %{
+              type: "string",
+              description: "Filter by channel name (e.g. '@alice', 'main:default')"
+            },
             direction: %{
               type: "string",
               enum: ["in", "out", "publish"],
               description: "Filter by message direction"
             },
-            since_id: %{type: "integer", description: "Only return entries after this ID (for polling)"}
+            since_id: %{
+              type: "integer",
+              description: "Only return entries after this ID (for polling)"
+            }
           }
         }
       },
@@ -176,7 +189,10 @@ defmodule Mooncore.MCP.Protocol do
           type: "object",
           properties: %{
             group: %{type: "string", description: "Group key (dkey) to target"},
-            event: %{type: "string", description: "Event name (e.g. 'notification', 'task-updated')"},
+            event: %{
+              type: "string",
+              description: "Event name (e.g. 'notification', 'task-updated')"
+            },
             message: %{type: "object", description: "Payload to send"},
             channels: %{
               type: "array",

@@ -421,7 +421,7 @@ end
 
 ## Dev Tools
 
-When `mooncore_dev_tools: true` is configured:
+When `mooncore_dev_tools: true` is configured and `MOONCORE_DEV_SECRET` is set:
 - Dev dashboard at `http://localhost:4040/` — VM metrics, action runner, console, file browser
 - MCP server at `http://localhost:4040/mcp` — connect VS Code or other AI tools
 - All action executions are logged and visible in the dashboard
@@ -446,4 +446,4 @@ mix deps.get
 mix run --no-halt
 ```
 
-The server starts on the configured port (default 4000). Dev dashboard on port 4040 if mooncore_dev_tools is enabled.
+The server starts on the configured port (default 4000). Dev dashboard on port 4040 if `mooncore_dev_tools: true` is set and `MOONCORE_DEV_SECRET` is set.

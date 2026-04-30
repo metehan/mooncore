@@ -315,7 +315,7 @@ Action errors are caught and returned as error maps — they don't crash the Web
 
 ## Observability (Dev Tools)
 
-When `mooncore_dev_tools: true`, every incoming and outgoing socket message is logged with:
+When `mooncore_dev_tools: true` is configured, every incoming and outgoing socket message is logged with:
 - Direction (`in` / `publish`)
 - User and dkey
 - Active channels at the time
