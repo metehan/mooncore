@@ -308,14 +308,6 @@ defmodule Mooncore.Dev.Plug do
       expiry_ts = now + expiry_seconds
       token = dev_session_token(secret, expiry_ts)
 
-      base_url =
-        conn
-        |> request_url()
-        |> URI.parse()
-        |> then(fn %URI{scheme: s, host: h, port: p} ->
-          "#{s}://#{h}#{if (s == "http" and p == 80) or (s == "https" and p == 443), do: "", else: ":#{p}"}"
-        end)
-
       # Store expiry alongside token so check_dev_auth can verify it
       conn
       |> put_resp_cookie("mooncore_dev", token,
