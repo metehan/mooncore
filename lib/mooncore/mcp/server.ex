@@ -217,7 +217,7 @@ defmodule Mooncore.MCP.Server do
   ## Params
   - `action` — action name string
   - `params` — map of params to pass
-  - `auth` — optional auth map (roles, user, app, dkey, scope)
+  - `auth` — optional auth map (roles, user, app, tenant, scope)
   """
   def run_action(action, params \\ %{}, auth \\ nil) do
     if not Mooncore.mooncore_dev_tools_enabled?() do
@@ -271,7 +271,7 @@ defmodule Mooncore.MCP.Server do
   Publish a WebSocket message to connected clients. Requires MOONCORE_DEV_SECRET.
 
   ## Params
-  - `group` — the dkey/group to target (required)
+  - `group` — the tenant/group to target (required)
   - `event` — event name string (required)
   - `message` — payload map or value (required)
   - `channels` — list of channel strings (default: ["main:default"])

@@ -14,7 +14,7 @@ defmodule Mooncore.Middleware do
 
         @impl true
         def call(req) do
-          db = MyApp.DB.link(req[:auth]["dkey"])
+          db = MyApp.DB.link(req[:auth]["tenant"])
           Map.put(req, :db, db)
         end
       end

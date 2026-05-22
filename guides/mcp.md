@@ -84,7 +84,7 @@ Execute a Mooncore action through the full pipeline (role checking, middleware, 
 | -------- | ------ | -------- | -------------------------------------------- |
 | `action` | string | yes      | Action name (e.g. `task.create`)             |
 | `params` | object | no       | Parameters to pass to the action             |
-| `auth`   | object | no       | Auth context (roles, user, app, dkey, scope) |
+| `auth`   | object | no       | Auth context (roles, user, app, tenant, scope) |
 
 ### eval
 

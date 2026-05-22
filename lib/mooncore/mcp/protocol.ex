@@ -108,7 +108,7 @@ defmodule Mooncore.MCP.Protocol do
             params: %{type: "object", description: "Parameters to pass to the action"},
             auth: %{
               type: "object",
-              description: "Optional auth map (roles, user, app, dkey, scope)"
+              description: "Optional auth map (roles, user, app, tenant, scope)"
             }
           },
           required: ["action"]
@@ -188,7 +188,7 @@ defmodule Mooncore.MCP.Protocol do
         inputSchema: %{
           type: "object",
           properties: %{
-            group: %{type: "string", description: "Group key (dkey) to target"},
+            group: %{type: "string", description: "Group key (tenant) to target"},
             event: %{
               type: "string",
               description: "Event name (e.g. 'notification', 'task-updated')"

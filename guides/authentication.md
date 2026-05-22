@@ -45,7 +45,7 @@ Mooncore tokens contain these claims:
 | ------- | ------- | -------------------------------------------------- |
 | `user`  | string  | User identifier                                    |
 | `app`   | string  | App key — routes to the correct action module      |
-| `dkey`  | string  | Domain/tenant key — for multi-tenant isolation     |
+| `tenant`| string  | Tenant key — for multi-tenant isolation            |
 | `scope` | string  | Data scope — further isolation within a domain     |
 | `roles` | string  | Base58-encoded bitmask of user roles               |
 | `aud`   | string  | Audience — always `"api"`                          |
@@ -68,7 +68,7 @@ encoded_roles = Mooncore.Util.Base58.from_integer(
 {:ok, token} = Mooncore.Auth.Token.new_token(%{
   "user" => "alice",
   "app" => "myapp",
-  "dkey" => "acme-corp",
+  "tenant" => "acme-corp",
   "scope" => "default",
   "roles" => encoded_roles
 })
@@ -174,7 +174,7 @@ role_string = Mooncore.Util.Base58.from_integer(bitmask)
 {:ok, token} = Mooncore.Auth.Token.new_token(%{
   "user" => "alice",
   "app" => "myapp",
-  "dkey" => "acme",
+  "tenant" => "acme",
   "scope" => "default",
   "roles" => role_string
 })

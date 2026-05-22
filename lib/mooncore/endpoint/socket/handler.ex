@@ -40,7 +40,7 @@ defmodule Mooncore.Endpoint.Socket.Handler do
         # Only subscribe to the personal channel automatically.
         # The scope channel (main:{scope}) must be joined explicitly
         # to avoid putting all clients in one massive channel.
-        Clients.add_member(auth["dkey"], "@#{auth["user"]}", self())
+        Clients.add_member(auth["tenant"], "@#{auth["user"]}", self())
         ["@#{auth["user"]}"]
       else
         Clients.add_member(@anon_group, @anon_channel, self())
@@ -73,7 +73,7 @@ defmodule Mooncore.Endpoint.Socket.Handler do
         direction: direction,
         pid: inspect(self()),
         user: state.auth && state.auth["user"],
-        dkey: state.auth && state.auth["dkey"],
+        tenant: state.auth && state.auth["tenant"],
         channels: state.listening,
         payload: payload
       })
@@ -145,7 +145,7 @@ defmodule Mooncore.Endpoint.Socket.Handler do
         # doesn't leave stale channel entries pointing to this PID.
         listening =
           if not state.anon and state.auth do
-            Clients.remove_member(state.auth["dkey"], state.listening, self())
+            Clients.remove_member(state.auth["tenant"], state.listening, self())
             []
           else
             state.listening
@@ -153,7 +153,7 @@ defmodule Mooncore.Endpoint.Socket.Handler do
 
         # Only auto-subscribe to personal channel.
         # Scope channel (main:{scope}) requires explicit ["join", "main"].
-        Clients.add_member(auth["dkey"], "@#{auth["user"]}", self())
+        Clients.add_member(auth["tenant"], "@#{auth["user"]}", self())
         personal = "@#{auth["user"]}"
 
         listening =
@@ -184,7 +184,7 @@ defmodule Mooncore.Endpoint.Socket.Handler do
 
     if allowed do
       scoped_channel = "#{channel}:#{state.auth["scope"]}"
-      Clients.add_member(state.auth["dkey"], scoped_channel, self())
+      Clients.add_member(state.auth["tenant"], scoped_channel, self())
 
       state =
         if scoped_channel in state.listening,
@@ -203,7 +203,7 @@ defmodule Mooncore.Endpoint.Socket.Handler do
 
     if state.auth do
       scoped_channel = "#{channel}:#{state.auth["scope"]}"
-      Clients.remove_member(state.auth["dkey"], [scoped_channel], self())
+      Clients.remove_member(state.auth["tenant"], [scoped_channel], self())
 
       state =
         Map.merge(state, %{
@@ -273,7 +273,7 @@ defmodule Mooncore.Endpoint.Socket.Handler do
       Clients.remove_member(@anon_group, [@anon_channel], self())
     else
       if state.auth do
-        Clients.remove_member(state.auth["dkey"], state.listening, self())
+        Clients.remove_member(state.auth["tenant"], state.listening, self())
       end
     end
 

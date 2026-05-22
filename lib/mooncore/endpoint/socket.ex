@@ -27,7 +27,7 @@ defmodule Mooncore.Endpoint.Socket do
         direction: :publish,
         pid: nil,
         user: nil,
-        dkey: group,
+        tenant: group,
         channels: channels,
         payload: [name, message]
       })

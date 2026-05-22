@@ -15,7 +15,7 @@ defmodule Mooncore.Auth.Token do
   Tokens contain:
   - `"user"` — user identifier
   - `"app"` — app key (for routing to correct action module)
-  - `"dkey"` — domain/tenant key
+  - `"tenant"` — tenant key for multi-tenant isolation
   - `"scope"` — scope for data isolation
   - `"roles"` — Base58-encoded bitmask of roles
   - `"aud"` — audience ("api")

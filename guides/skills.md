@@ -9,6 +9,8 @@ This guide is for AI coding agents (GitHub Copilot, Claude, Cursor, etc.) helpin
 3. **Action handlers are plain functions.** They take a map, return a map. No base class, no macro, no special return wrapper.
 4. **`req[:params]` is the full request body.** User data sits alongside `"action"` at the top level — there is no `params.body` or nested structure.
 5. **Mooncore.Application starts the HTTP server automatically.** Never add Bandit or the HTTP server to your app's supervision tree.
+6. **Write tests for new behavior.** Guides help humans and agents explore the system, but they do not replace ExUnit coverage.
+7. **Use Mooncore MCP heavily during development when available.** Prefer the built-in MCP server for action discovery, runtime inspection, log reading, and action execution instead of guessing or hand-rolling verification flows.
 
 ## Project Scaffold
 
@@ -28,7 +30,8 @@ my_app/
 │       │   └── example.ex     # Action module + handlers
 │       └── router.ex          # Plug.Router
 ├── test/
-│   └── test_helper.exs
+│   ├── test_helper.exs
+│   └── my_app/action/main_test.exs
 └── mix.exs
 ```
 
@@ -190,7 +193,7 @@ end
 
 ### guides/actions.md
 
-Create a companion guide for every new action or action module.
+Create tests and a companion guide for every new action or action module.
 
 Keep the guide in `guides/` so the Dev Tools Guides screen can list it, open it, and run any Elixir code blocks inline.
 
@@ -198,13 +201,15 @@ Each guide should explain:
 
 - what the action or action group does
 - how to call it with `Mooncore.Action.execute/2`
-- `curl` and WebSocket examples when relevant
+- transport behavior and payload shape when relevant, using runnable Elixir examples for verification
 - the expected inputs, roles, and middleware
 - a short test or verification flow so the developer can see it working
 
 Split guides by domain so each action group has its own file, such as `guides/users.md` or `guides/billing.md`.
 
-Keep each code block short and independently runnable. Large multi-step snippets are harder to execute and debug safely in the Dev Tools inline runner.
+Keep each code block short and independently runnable. Use Elixir-tagged blocks for anything meant to run in the Dev Tools inline runner. Large multi-step snippets are harder to execute and debug safely there.
+
+Also add ExUnit coverage in `test/` for the same behavior. At minimum, cover the success path, relevant error path, and auth boundary when the action is protected.
 
 ## How Actions Work
 
@@ -230,7 +235,7 @@ def my_handler(req) do
   # Access auth (nil if unauthenticated/public action)
   user = req[:auth]["user"]           # "alice"
   roles = req[:auth]["roles"]         # ["user", "admin"]
-  dkey = req[:auth]["dkey"]           # "tenant-key"
+  tenant = req[:auth]["tenant"]       # "tenant-key"
 
   # Access middleware-injected keys
   db = req[:db]                       # from your DB middleware
@@ -250,31 +255,18 @@ end
 
 ### Calling Actions
 
-```bash
-# HTTP
-curl -X POST http://localhost:4000/run \
-  -H "Content-Type: application/json" \
-  -d '{"action": "item.create", "name": "Test"}'
+Describe raw HTTP or WebSocket payloads in prose if needed, but keep the runnable examples in Elixir so the Guides runner can execute them inline.
 
-# With auth
-curl -X POST http://localhost:4000/run \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <jwt-token>" \
-  -d '{"action": "item.create", "name": "Test"}'
-```
-
-```javascript
-// WebSocket
-ws.send(JSON.stringify({action: "item.create", name: "Test", rayid: "1"}))
-// Response: ["response", {name: "Test"}, "1"]
+```elixir
+Mooncore.Action.execute("item.create", %{params: %{"action" => "item.create", "name" => "Test"}, auth: nil})
 ```
 
 ```elixir
-# Elixir (through middleware pipeline)
-Mooncore.Action.execute("item.create", %{
-  params: %{"action" => "item.create", "name" => "Test"},
-  auth: %{"roles" => ["user"]}
-})
+Mooncore.Action.execute("item.create", %{params: %{"action" => "item.create", "name" => "Test"}, auth: %{"roles" => ["user"]}})
+```
+
+```elixir
+Mooncore.Action.execute("item.create", %{params: %{"action" => "item.create", "name" => "Test", "rayid" => "1"}, auth: %{"roles" => ["user"]}, rayid: "1"})
 ```
 
 ## Organizing Larger Applications
@@ -334,7 +326,7 @@ defmodule MyApp.Middleware.DB do
 
   @impl true
   def call(req) do
-    db = MyApp.DB.connect(req[:auth]["dkey"])
+    db = MyApp.DB.connect(req[:auth]["tenant"])
     Map.put(req, :db, db)
   end
 end
@@ -355,7 +347,7 @@ Broadcast events from action handlers:
 def create_item(req) do
   item = %{name: req[:params]["name"]}
   # Publish to all clients in the same tenant group
-  Mooncore.Endpoint.Socket.publish(req[:auth]["dkey"], {"item_created", item})
+  Mooncore.Endpoint.Socket.publish(req[:auth]["tenant"], {"item_created", item})
   {:ok, item}
 end
 ```
@@ -381,7 +373,7 @@ Add any database library as a dependency. Mooncore has no opinion here — use E
 
 ### Multi-Tenant Isolation
 
-Use `dkey` (domain key) from auth claims for tenant isolation. WebSocket channels, publishing, and client registries are all scoped by `dkey` automatically.
+Use `tenant` from auth claims for tenant isolation. WebSocket channels, publishing, and client registries are all scoped by `tenant` automatically.
 
 ### File Serving / Custom Pages
 
@@ -426,6 +418,13 @@ When `mooncore_dev_tools: true` is configured and `MOONCORE_DEV_SECRET` is set:
 - MCP server at `http://localhost:4040/mcp` — connect VS Code or other AI tools
 - All action executions are logged and visible in the dashboard
 
+When MCP is available, prefer this workflow during development:
+- Read resources like actions, apps, config, and clients before guessing runtime state
+- Use `run_action` to exercise actions through the full pipeline
+- Use `read_logs` and `clear_logs` while debugging behavior changes
+- Use `eval` for focused runtime inspection
+- Still write ExUnit tests; MCP complements tests, it does not replace them
+
 Add to `.vscode/mcp.json` to connect this framework's MCP server:
 
 ```json
@@ -441,9 +440,6 @@ Add to `.vscode/mcp.json` to connect this framework's MCP server:
 
 ## Running the Application
 
-```bash
-mix deps.get
-mix run --no-halt
-```
+Start the application from a terminal with `mix deps.get` and then `mix run --no-halt` before using the Guides runner examples.
 
 The server starts on the configured port (default 4000). Dev dashboard on port 4040 if `mooncore_dev_tools: true` is set and `MOONCORE_DEV_SECRET` is set.

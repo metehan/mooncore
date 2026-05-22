@@ -47,7 +47,7 @@ If the client didn't send a JWT during the HTTP upgrade, send it after connectin
 
 **Success response:**
 ```json
-["jwt", {"user": "alice", "app": "myapp", "roles": ["user"], "dkey": "acme-corp", "scope": "default"}]
+["jwt", {"user": "alice", "app": "myapp", "roles": ["user"], "tenant": "acme-corp", "scope": "default"}]
 ```
 
 **Failure response:**
@@ -153,11 +153,11 @@ Response:
 
 ### Channel Scoping & Tenant Isolation
 
-All channels are qualified by the client's `dkey` (domain key from the JWT). When you publish to a channel, only clients sharing the same `dkey` receive the message. Two different tenants with the same channel name never overlap.
+All channels are qualified by the client's `tenant` claim from the JWT. When you publish to a channel, only clients sharing the same `tenant` receive the message. Two different tenants with the same channel name never overlap.
 
 ```
-Client A: dkey=acme, channels=["@alice", "main:default"]
-Client B: dkey=globex, channels=["@alice", "main:default"]
+Client A: tenant=acme, channels=["@alice", "main:default"]
+Client B: tenant=globex, channels=["@alice", "main:default"]
 
 publish("acme", ..., ["main:default"])  → only Client A receives it
 ```
@@ -181,7 +181,7 @@ Mooncore.Endpoint.Socket.publish("acme-corp", {"chat_message", %{text: "Hey"}}, 
 ```
 
 Arguments:
-1. `group` (string) — the `dkey` that identifies which tenant's clients to target
+1. `group` (string) — the `tenant` that identifies which tenant's clients to target
 2. `{event_name, payload}` — a tuple with the event name and any term as payload; maps must not contain a `"password"` key (stripped automatically)
 3. `channels` (list) — defaults to `["main:default"]`
 
@@ -317,7 +317,7 @@ Action errors are caught and returned as error maps — they don't crash the Web
 
 When `mooncore_dev_tools: true` is configured, every incoming and outgoing socket message is logged with:
 - Direction (`in` / `publish`)
-- User and dkey
+- User and tenant
 - Active channels at the time
 - Full payload
 

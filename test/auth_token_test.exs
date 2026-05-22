@@ -21,7 +21,7 @@ defmodule Mooncore.Auth.TokenTest do
 
   describe "new_token/1 and solve/1" do
     test "creates a token that verifies successfully" do
-      claims = %{"user" => "alice", "app" => "myapp", "dkey" => "tenant1"}
+      claims = %{"user" => "alice", "app" => "myapp", "tenant" => "tenant1"}
 
       assert {:ok, token} = Token.new_token(claims)
       assert is_binary(token)
@@ -29,7 +29,7 @@ defmodule Mooncore.Auth.TokenTest do
       assert {:ok, verified} = Token.solve(token)
       assert verified["user"] == "alice"
       assert verified["app"] == "myapp"
-      assert verified["dkey"] == "tenant1"
+      assert verified["tenant"] == "tenant1"
       assert verified["aud"] == "api"
       assert verified["iss"] == "test_issuer"
       assert is_integer(verified["exp"])

@@ -241,7 +241,7 @@ For actions that require roles, you need a JWT token. In IEx:
 {:ok, token} = Mooncore.Auth.Token.new_token(%{
   "user" => "alice",
   "app" => "myapp",
-  "dkey" => "my-domain",
+  "tenant" => "my-domain",
   "scope" => "default",
   "roles" => Mooncore.Util.Base58.from_integer(
     Mooncore.Util.Deflist.to_integer(["admin", "user", "editor"], ["user"])

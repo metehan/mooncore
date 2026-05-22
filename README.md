@@ -157,7 +157,7 @@ defmodule MyApp.Action.Task do
     title = req[:params]["title"]
     # ... your persistence logic ...
     # Publish to WebSocket clients:
-    Mooncore.Endpoint.Socket.publish(req[:auth]["dkey"], {"task-created", %{title: title}})
+    Mooncore.Endpoint.Socket.publish(req[:auth]["tenant"], {"task-created", %{title: title}})
     {:ok, %{title: title}}
   end
 
@@ -278,7 +278,7 @@ defmodule MyApp.Middleware.DBLink do
 
   @impl true
   def call(req) do
-    db = MyApp.DB.resolve(req[:auth]["dkey"])
+    db = MyApp.DB.resolve(req[:auth]["tenant"])
     Map.put(req, :db, db)
   end
 end

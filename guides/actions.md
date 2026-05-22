@@ -127,7 +127,7 @@ The request map contains everything the handler needs:
   auth: %{                    # JWT claims (nil if unauthenticated)
     "user" => "alice",
     "app" => "myapp",
-    "dkey" => "my-domain",
+    "tenant" => "my-domain",
     "scope" => "default",
     "roles" => ["user", "admin"]
   },

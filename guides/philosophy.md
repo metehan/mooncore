@@ -82,7 +82,7 @@ Mooncore provides the mechanism to wire any data source you want into the reques
 defmodule MyApp.Middleware.DB do
   @behaviour Mooncore.Middleware
   def call(req) do
-    Map.put(req, :db, MyApp.DB.connection(req[:auth]["dkey"]))
+    Map.put(req, :db, MyApp.DB.connection(req[:auth]["tenant"]))
   end
 end
 ```
@@ -110,7 +110,7 @@ Adding multi-tenancy to an existing framework is painful. You end up with tenant
 
 Mooncore builds multi-tenancy into the core:
 
-- JWT tokens carry `app`, `dkey` (domain key), and `scope` fields
+- JWT tokens carry `app`, `tenant`, and `scope` fields
 - The action dispatcher routes to the correct app's action module based on the token
 - WebSocket channels are scoped per domain
 - The client registry tracks connections per group and channel
