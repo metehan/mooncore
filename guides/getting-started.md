@@ -73,6 +73,7 @@ config :mooncore,
 | `after_action`          | list    | Middleware modules run after actions                                                        |
 | `mooncore_dev_tools`    | boolean | Enables dev dashboard and MCP server (also requires `MOONCORE_DEV_SECRET` env var)          |
 | `dev_tools_allowed_ips` | list    | IP allowlist for dev tools (e.g. `["127.0.0.1", "10.0.0.0/8"]`). If unset, all IPs allowed. |
+| `oauth_access_token_ttl_seconds` | integer | MCP OAuth access token lifetime in seconds (default: 1,209,600 / 14 days). |
 
 ## Step 1: Define Your App
 

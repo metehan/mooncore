@@ -18,6 +18,7 @@ defmodule Mooncore do
         mooncore_dev_tools: true,   # also requires MOONCORE_DEV_SECRET env var
         dev_tools_allowed_ips: ["127.0.0.1", "10.0.0.0/8"],
         oauth_redirect_uris: [],    # extra OAuth redirect URI allowlist (localhost/https always allowed)
+        oauth_access_token_ttl_seconds: 1_209_600, # 14 days
         before_action: [],
         after_action: []
   """

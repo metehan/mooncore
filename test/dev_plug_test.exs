@@ -35,6 +35,36 @@ defmodule Mooncore.Dev.PlugTest do
     Jason.decode!(conn.resp_body)
   end
 
+  defp issue_oauth_token do
+    verifier = "mooncore-test-code-verifier"
+
+    challenge =
+      :crypto.hash(:sha256, verifier)
+      |> Base.url_encode64(padding: false)
+
+    authorize_conn =
+      call(:post, "/oauth/authorize", %{
+        "password" => System.fetch_env!("MOONCORE_DEV_SECRET"),
+        "redirect_uri" => "http://localhost/callback",
+        "state" => "test-state",
+        "code_challenge" => challenge
+      })
+
+    location = json_body(authorize_conn)["location"]
+
+    code =
+      location |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query() |> Map.fetch!("code")
+
+    token_conn =
+      call(:post, "/oauth/token", %{
+        "grant_type" => "authorization_code",
+        "code" => code,
+        "code_verifier" => verifier
+      })
+
+    {token_conn, json_body(token_conn)}
+  end
+
   # ── Setup ──────────────────────────────────────────────────────────────────
 
   setup do
@@ -43,6 +73,7 @@ defmodule Mooncore.Dev.PlugTest do
 
     on_exit(fn ->
       Application.delete_env(:mooncore, :mooncore_dev_tools)
+      Application.delete_env(:mooncore, :oauth_access_token_ttl_seconds)
     end)
 
     :ok
@@ -116,6 +147,56 @@ defmodule Mooncore.Dev.PlugTest do
 
       conn = call_authed(:get, "/api/actions")
       assert conn.status == 200
+    end
+  end
+
+  # ── OAuth authentication ──────────────────────────────────────────────────
+
+  describe "OAuth authentication" do
+    setup do
+      original_secret = System.get_env("MOONCORE_DEV_SECRET")
+      System.put_env("MOONCORE_DEV_SECRET", "oauth_test_secret")
+
+      on_exit(fn ->
+        if original_secret do
+          System.put_env("MOONCORE_DEV_SECRET", original_secret)
+        else
+          System.delete_env("MOONCORE_DEV_SECRET")
+        end
+      end)
+
+      :ok
+    end
+
+    test "issues access tokens that remain valid for 14 days by default" do
+      {conn, body} = issue_oauth_token()
+
+      assert conn.status == 200
+      assert body["token_type"] == "Bearer"
+      assert body["expires_in"] in 1_209_599..1_209_600
+
+      authed_conn =
+        conn(:get, "/api/actions")
+        |> put_req_header("authorization", "Bearer #{body["access_token"]}")
+        |> Mooncore.Dev.Plug.call([])
+
+      assert authed_conn.status == 200
+    end
+
+    test "uses the configured access token lifetime" do
+      Application.put_env(:mooncore, :oauth_access_token_ttl_seconds, 600)
+
+      {_conn, body} = issue_oauth_token()
+
+      assert body["expires_in"] in 599..600
+    end
+
+    test "falls back to 14 days for an invalid configured lifetime" do
+      Application.put_env(:mooncore, :oauth_access_token_ttl_seconds, -1)
+
+      {_conn, body} = issue_oauth_token()
+
+      assert body["expires_in"] in 1_209_599..1_209_600
     end
   end
 

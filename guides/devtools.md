@@ -18,6 +18,7 @@ The secret is mandatory: it protects the dashboard and MCP server. Without it th
 config :mooncore,
   mooncore_dev_tools: true,
   mcp_port: 4040,                # default, can be changed
+  oauth_access_token_ttl_seconds: 1_209_600, # default: 14 days
   dev_tools_allowed_ips: [        # optional IP allowlist
     "127.0.0.1",
     "::1",
@@ -41,6 +42,11 @@ MOONCORE_DEV_SECRET=your-secret mix run --no-halt
 When both are configured, a dedicated HTTP server starts on `mcp_port` (default 4040). Open `http://localhost:4040/` in your browser.
 
 When either is missing, nothing dev-related starts — no server, no watcher, no overhead.
+
+MCP clients authenticate through OAuth access tokens. Tokens remain valid for 14 days by
+default. Set `oauth_access_token_ttl_seconds` to a positive integer to choose a different
+lifetime. These tokens grant the same unrestricted dev-tools access as
+`MOONCORE_DEV_SECRET`, so keep the server limited to trusted development networks.
 
 ## Dashboard Screens
 

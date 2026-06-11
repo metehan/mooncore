@@ -253,6 +253,15 @@ Once connected, the AI agent can:
 - **Evaluate code** — run Elixir expressions in your live app
 - **Browse resources** — see all actions, apps, clients, and config
 
+OAuth access tokens are valid for 14 days by default. Configure a different positive
+lifetime in seconds when needed:
+
+```elixir
+Application.put_env(:mooncore, :oauth_access_token_ttl_seconds, 1_209_600)
+```
+
+Changing `MOONCORE_DEV_SECRET` immediately invalidates previously issued tokens.
+
 ### Example AI Workflow
 
 The agent reads `mooncore://actions` to understand your API, then uses `run_action` to test an endpoint, reads logs to debug issues, and uses `eval` to inspect application state.

@@ -25,10 +25,13 @@ defmodule Mooncore.Dev.Plug do
         ],
         oauth_redirect_uris: [          # optional extra OAuth redirect URI allowlist
           "https://myapp.example.com/callback"
-        ]
+        ],
+        oauth_access_token_ttl_seconds: 1_209_600 # default: 14 days
   """
 
   use Plug.Router
+
+  @default_oauth_access_token_ttl_seconds 14 * 24 * 60 * 60
 
   plug(:check_mooncore_dev_tools)
   plug(:check_dev_ip)
@@ -1773,13 +1776,23 @@ defmodule Mooncore.Dev.Plug do
 
   # Access token format: "#{expiry}.#{hmac}"
   defp oauth_issue_access_token(secret, _code_expiry) do
-    expiry = System.system_time(:second) + 3600
+    expiry = System.system_time(:second) + oauth_access_token_ttl_seconds()
 
     hmac =
       :crypto.mac(:hmac, :sha256, secret, "mooncore-oauth-token.#{expiry}")
       |> Base.url_encode64(padding: false)
 
     {"#{expiry}.#{hmac}", expiry}
+  end
+
+  defp oauth_access_token_ttl_seconds do
+    case Mooncore.config(
+           :oauth_access_token_ttl_seconds,
+           @default_oauth_access_token_ttl_seconds
+         ) do
+      ttl when is_integer(ttl) and ttl > 0 -> ttl
+      _invalid_ttl -> @default_oauth_access_token_ttl_seconds
+    end
   end
 
   defp oauth_verify_access_token(secret, token) do
